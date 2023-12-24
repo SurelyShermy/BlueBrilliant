@@ -1,10 +1,19 @@
 use std::rc::Rc;
+
 struct CastlingRights {
-    kingSide: bool,
-    queenSide: bool,
+    king_side: bool,
+    queen_side: bool,
+}
+impl CastlingRights {
+    pub fn new() -> CastlingRights {
+        CastlingRights {
+            king_side: true,
+            queen_side: true,
+        }
+    }
 }
 //Thinking that having a boardstate that contains variables that need to be copied and a gamestate that contains variables that don't need to be copied
-struct boardState {
+pub struct BoardState {
     turn: bool,
     // true = white, false = black
     // made a bool since it can be stored in 1 bit
@@ -30,16 +39,16 @@ struct boardState {
     white_king_pos: u8,
     black_king_pos: u8,
 }
-struct gameState {
+pub struct GameState {
     time_increment_on: bool,
     last_move: [u8; 4],
     move_history: Vec<String>,
     position_history: Vec<String>,
     result: Option<f32>,
 }
-impl boardState {
-    fn copyboardState(&self) -> boardState {
-        boardState {
+impl BoardState {
+    pub fn copy_board_State(&self) -> BoardState {
+        BoardState {
             //TODO: add all variables to be copied
             turn: self.turn,
             board: self.board.clone(),
@@ -61,8 +70,8 @@ impl boardState {
             black_king_pos: self.black_king_pos,
         }
     }
-    fn new() -> boardState {
-        let mut board = [EMPTY; 128];
+    pub fn new() -> BoardState {
+        let mut board = [0; 128];
 
         // Place white pieces
         board[0] = WHITE | ROOK;
@@ -93,12 +102,21 @@ impl boardState {
         board[0x75] = BLACK | BISHOP;
         board[0x76] = BLACK | KNIGHT;
         board[0x77] = BLACK | ROOK;
-
-        boardState {
+        let white_attack_map: Vec<Vec<u8>> = (0..64).map(|_| Vec::new()).collect();
+        let black_attack_map: Vec<Vec<u8>> = (0..64).map(|_| Vec::new()).collect();
+        BoardState {
             turn: true,
             board,
-            white_attack_map: [vec![]; 64],
-            black_attack_map: [vec![]; 64],
+            white_attack_map: white_attack_map
+                .try_into()
+                .unwrap_or_else(|v: Vec<Vec<u8>>| {
+                    panic!("Expected a Vec of length 64 but it was {}", v.len())
+                }),
+            black_attack_map: black_attack_map
+                .try_into()
+                .unwrap_or_else(|v: Vec<Vec<u8>>| {
+                    panic!("Expected a Vec of length 64 but it was {}", v.len())
+                }),
             check: false,
             checking_squares: Rc::new(vec![]),
             checkmate: false,
@@ -113,11 +131,11 @@ impl boardState {
         }
     }
 }
-impl gameState {
-    fn new() -> gameState {
-        gameState {
+impl GameState {
+    pub fn new() -> GameState {
+        GameState {
             time_increment_on: false,
-            last_move: [u8; 4],
+            last_move: [0; 4],
             move_history: vec![],
             position_history: vec![],
             result: None,

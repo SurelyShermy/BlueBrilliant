@@ -1,5 +1,10 @@
-use std::io;
+pub mod game {
+    pub mod initialization;
+}
+pub mod gui; // This is your new GUI module
 
-fn main() {
-    println!("Hello, world!");
+use game::initialization::*;
+use iced::Sandbox;
+fn main() -> iced::Result {
+    gui::Chessboard::run(iced::Settings::default())
 }

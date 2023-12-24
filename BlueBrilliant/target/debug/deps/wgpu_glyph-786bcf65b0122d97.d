@@ -1,0 +1,10 @@
+C:\Users\alexa\Documents\UB\BlueBrilliant v2\BlueBrilliant\BlueBrilliant\target\debug\deps\libwgpu_glyph-786bcf65b0122d97.rmeta: C:\Users\alexa\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wgpu_glyph-0.16.0\src\lib.rs C:\Users\alexa\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wgpu_glyph-0.16.0\src\builder.rs C:\Users\alexa\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wgpu_glyph-0.16.0\src\pipeline.rs C:\Users\alexa\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wgpu_glyph-0.16.0\src\pipeline\cache.rs C:\Users\alexa\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wgpu_glyph-0.16.0\src\region.rs C:\Users\alexa\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wgpu_glyph-0.16.0\src\shader/glyph.wgsl
+
+C:\Users\alexa\Documents\UB\BlueBrilliant v2\BlueBrilliant\BlueBrilliant\target\debug\deps\wgpu_glyph-786bcf65b0122d97.d: C:\Users\alexa\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wgpu_glyph-0.16.0\src\lib.rs C:\Users\alexa\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wgpu_glyph-0.16.0\src\builder.rs C:\Users\alexa\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wgpu_glyph-0.16.0\src\pipeline.rs C:\Users\alexa\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wgpu_glyph-0.16.0\src\pipeline\cache.rs C:\Users\alexa\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wgpu_glyph-0.16.0\src\region.rs C:\Users\alexa\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wgpu_glyph-0.16.0\src\shader/glyph.wgsl
+
+C:\Users\alexa\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wgpu_glyph-0.16.0\src\lib.rs:
+C:\Users\alexa\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wgpu_glyph-0.16.0\src\builder.rs:
+C:\Users\alexa\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wgpu_glyph-0.16.0\src\pipeline.rs:
+C:\Users\alexa\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wgpu_glyph-0.16.0\src\pipeline\cache.rs:
+C:\Users\alexa\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wgpu_glyph-0.16.0\src\region.rs:
+C:\Users\alexa\.cargo\registry\src\index.crates.io-6f17d22bba15001f\wgpu_glyph-0.16.0\src\shader/glyph.wgsl:
