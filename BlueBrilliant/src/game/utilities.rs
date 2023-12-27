@@ -116,3 +116,23 @@ pub fn isSlider(piece: u8) -> bool {
     }
     false
 }
+pub fn calculate_path(board_state: &BoardState) {
+    let mut path = Vec::new();
+    let checking_square = board_state.checking_squares[0][0];
+    if (piece_type(board_state.board[checking_square]) == KNIGHT) {
+        path.push(checking_square);
+    } else {
+        let mut temp_position = checking_square;
+        let vector = board_state.checking_squares[0][1];
+        let player_king_pos = if (color == WHITE) {
+            board_state.white_king_pos
+        } else {
+            board_state.black_king_pos
+        };
+        while (on_board(temp_position as i16) && temp_position != player_king_pos) {
+            path.push(temp_position);
+            temp_position += vector;
+        }
+    }
+    return path;
+}

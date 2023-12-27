@@ -47,7 +47,7 @@ pub struct GameState {
     result: Option<f32>,
 }
 impl BoardState {
-    pub fn copy_board_State(&self) -> BoardState {
+    pub fn copy_board_state(&self) -> BoardState {
         BoardState {
             //TODO: add all variables to be copied
             turn: self.turn,

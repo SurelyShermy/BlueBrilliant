@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Chess Game</title>
+    <link rel="stylesheet" type="text/css" href="styles.css" />
+    <style>
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background-image: url("./images/chessboardBackground.png");
+        background-position: center;
+        background-position-y: -70px;
+        background-position-x: -33px;
+        /* background-position-y: 80%;
+        background-position-x: 30%; */
+        background-size: cover;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="chessContainer">
+      <div id="engineStatus">
+        <img
+          src="./images/newlogo.png"
+          alt="BlueBrilliant Logo"
+          class="engine-logo"
+        />
+        <span class="engine-name">BlueBrilliant</span>
+        <div class="spinner" id="spinner"></div>
+      </div>
+      <div id="chessBoard"></div>
+    </div>
+    <div id="win-modal-container" class="win-modal-container"></div>
+    <div id="lose-modal-container" class="lose-modal-container"></div>
+    <div id="draw-modal-container" class="draw-modal-container"></div>
+
+    <!-- <div id="fenInputContainer">
+      <input
+        type="text"
+        id="fenInput"
+        placeholder="Enter FEN string here"
+        size="70"
+      />
+      <button onclick="applyFEN()">Go</button>
+    </div> -->
+
+    
+
+    <div id="white-captured-pieces" class="captured-pieces-box"></div>
+    <div id="black-captured-pieces" class="captured-pieces-box"></div>
+    <div id="white-timer">White: 0:00</div>
+    <div id="black-timer">Black: 0:00</div>
+    <footer class="container-fluid text-center">
+      <p>
+        Developed by Alex Sherman and Dylan Zinsley
+      </p>
+    </footer>
+
+    <div id="engineThinkingOverlay"></div>
+
+    <!--Apparently Adding scripts to the bottom of body is ideal so here it is-->
+    <script>
+      function loadScript(src, onload) {
+        let script = document.createElement("script");
+        script.onload = onload
+          ? onload
+          : function (e) {
+              console.log(e.target.src + " is loaded.");
+            };
+        script.src = src;
+        script.async = false;
+        document.head.appendChild(script);
+      }
+
+      // loadScript("fetchFEN.js");
+      loadScript("setup.js");
+      loadScript("utilities.js");
+      loadScript("board.js");
+      loadScript("evaluation.js");
+      loadScript("rules.js");
+      loadScript("evaluationUtils.js");
+      loadScript("transposition.js");
+      loadScript("engine.js");
+      loadScript("lose.js");
+      loadScript("win.js");
+      loadScript("merge.js");
+      loadScript("soundmgmt.js");
+    </script>
+    <!-- <script src="engine.js"></script>
+    <script src="fetchFEN.js"></script>
+    <script src="setup.js"></script>
+    <script src="utilities.js" defer></script>
+    <script src="evaluation.js"></script>
+    <script src="board.js"></script>
+    <script src="rules.js"></script> -->
+    <input id="forfeit" type="button" value="Forfeit" />
+  </body>
+</html>
