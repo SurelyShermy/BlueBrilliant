@@ -19,8 +19,8 @@ pub struct BoardState {
     // made a bool since it can be stored in 1 bit
     //Deep Copy Variables
     board: [u8; 128],
-    white_attack_map: [Vec<u8>; 64],
-    black_attack_map: [Vec<u8>; 64],
+    white_attack_map: [Vec<u8>; 128],
+    black_attack_map: [Vec<u8>; 128],
 
     //0x88 board so 0-128
     //Since the board should never be
@@ -102,20 +102,20 @@ impl BoardState {
         board[0x75] = BLACK | BISHOP;
         board[0x76] = BLACK | KNIGHT;
         board[0x77] = BLACK | ROOK;
-        let white_attack_map: Vec<Vec<u8>> = (0..64).map(|_| Vec::new()).collect();
-        let black_attack_map: Vec<Vec<u8>> = (0..64).map(|_| Vec::new()).collect();
+        let white_attack_map: Vec<Vec<u8>> = (0..128).map(|_| Vec::new()).collect();
+        let black_attack_map: Vec<Vec<u8>> = (0..128).map(|_| Vec::new()).collect();
         BoardState {
             turn: true,
             board,
             white_attack_map: white_attack_map
                 .try_into()
                 .unwrap_or_else(|v: Vec<Vec<u8>>| {
-                    panic!("Expected a Vec of length 64 but it was {}", v.len())
+                    panic!("Expected a Vec of length 128 but it was {}", v.len())
                 }),
             black_attack_map: black_attack_map
                 .try_into()
                 .unwrap_or_else(|v: Vec<Vec<u8>>| {
-                    panic!("Expected a Vec of length 64 but it was {}", v.len())
+                    panic!("Expected a Vec of length 128 but it was {}", v.len())
                 }),
             check: false,
             checking_squares: Rc::new(vec![]),
@@ -143,16 +143,34 @@ impl GameState {
     }
 }
 
+pub enum Direction {
+    North,
+    South,
+    East,
+    West,
+    NorthEast,
+    NorthWest,
+    SouthEast,
+    SouthWest,
+}
+
+impl Direction {
+    pub fn value(&self) -> isize {
+        match self {
+            Direction::North => 16,
+            Direction::South => -16,
+            Direction::East => 1,
+            Direction::West => -1,
+            Direction::NorthEast => 17,
+            Direction::NorthWest => 15,
+            Direction::SouthEast => -15,
+            Direction::SouthWest => -17,
+        }
+    }
+}
+
 //Directions
 //Uses i8s for directions since needs to be signed
-const NW: i8 = 15;
-const NE: i8 = 17;
-const N: i8 = 16;
-const S: i8 = -16;
-const SW: i8 = -17;
-const SE: i8 = -15;
-const E: i8 = 1;
-const W: i8 = -1;
 const KNIGHT_MOVES: [i8; 8] = [33, 31, 18, 14, -33, -31, -18, -14];
 
 //Pieces

@@ -64,7 +64,7 @@ pub fn isBlack(piece: u8) -> bool {
     }
     piece & BLACK == BLACK
 }
-pub fn pieceColor(piece: u8) -> bool {
+pub fn pieceColor(piece: u8) -> u8 {
     if (isWhite(piece)) {
         return WHITE;
     }
@@ -89,7 +89,7 @@ pub fn pieceType(piece: u8) -> u8 {
     piece & 0b111
 }
 
-pub fn isRookOrQueen(piece: u8) -> bool {
+pub fn is_rook_or_queen(piece: u8) -> bool {
     if piece == 0 {
         return false;
     }
@@ -98,7 +98,7 @@ pub fn isRookOrQueen(piece: u8) -> bool {
     }
     false
 }
-pub fn isBishopOrQueen(piece: u8) -> bool {
+pub fn is_bishop_or_queen(piece: u8) -> bool {
     if piece == 0 {
         return false;
     }
@@ -107,11 +107,11 @@ pub fn isBishopOrQueen(piece: u8) -> bool {
     }
     false
 }
-pub fn isSlider(piece: u8) -> bool {
+pub fn is_slider(piece: u8) -> bool {
     if piece == 0 {
         return false;
     }
-    if (isRookOrQueen(piece) || isBishopOrQueen(piece)) {
+    if (is_rook_or_queen(piece) || is_bishop_or_queen(piece)) {
         return true;
     }
     false
