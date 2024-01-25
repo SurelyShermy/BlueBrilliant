@@ -1,0 +1,14 @@
+DONE 1) Enpassant for captures
+DONE 2) Extend knight logic to any # of knights
+DONE 3) Implement king moves
+DONE 4) Implement castling
+DONE 5) implement move logic
+DONE 6) Implement king check logic
+    - do a basic just filtering out first -- can be adapted later
+DONE 7) Implement load positions
+DONE 8) Change board to vectors
+    - just append instead of holding cur_moves
+DONE 9) Implement for black
+DONE 10) Fix the move check logic
+11) complete move logic for all moves
+12) Test
