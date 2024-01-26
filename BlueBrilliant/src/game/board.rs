@@ -273,7 +273,7 @@ fn generate_pawn_moves(board: &Board, moves: &mut Vec<u8>) {
         while single_push != 0 {
             let idx:i8 = single_push.trailing_zeros() as i8;    
             single_push = ((ALL_SQUARES << idx) << 1) & single_push;
-            moves.push((idx - NORT) as u8); //rip post increment :(
+            moves.push((idx - NORT) as u8);
             moves.push(idx as u8);
         }
         while double_push != 0 {
@@ -323,13 +323,13 @@ fn generate_pawn_moves(board: &Board, moves: &mut Vec<u8>) {
 
         while single_push != 0 {
             let idx:i8 = single_push.trailing_zeros() as i8;    
-            single_push = (ALL_SQUARES << (idx + 1)) & single_push;
+            single_push = ((ALL_SQUARES << idx) << 1) & single_push;
             moves.push((idx - SOUT) as u8);
             moves.push(idx as u8);
         }
         while double_push != 0 {
             let idx:i8 = double_push.trailing_zeros() as i8;    
-            double_push = (ALL_SQUARES << (idx + 1)) & double_push;
+            double_push = ((ALL_SQUARES << idx) << 1) & double_push;
             moves.push((idx - 2*SOUT) as u8);
             moves.push(idx as u8);
         }
@@ -340,14 +340,14 @@ fn generate_pawn_moves(board: &Board, moves: &mut Vec<u8>) {
         
         while capture_left != 0 {
             let idx: i8 =  capture_left.trailing_zeros() as i8;
-            capture_left = (ALL_SQUARES << (idx + 1)) & capture_left;
+            capture_left = ((ALL_SQUARES << idx) << 1) & capture_left;
             moves.push((idx - SOWE) as u8);
             moves.push(idx as u8);
         }
         
         while capture_right != 0 {
             let idx: i8 =  capture_right.trailing_zeros() as i8;
-            capture_right = (ALL_SQUARES << (idx + 1)) & capture_right;
+            capture_right = ((ALL_SQUARES << idx) << 1) & capture_right;
             moves.push((idx - SOEA) as u8);
             moves.push(idx as u8);
         }
@@ -431,7 +431,7 @@ fn generate_knight_moves(board: &Board, moves: &mut Vec<u8>) {
 
         while n_moves[i] != 0 {
             let idx:i8 =  n_moves[i].trailing_zeros() as i8;
-            n_moves[i] &= ALL_SQUARES << (idx + 1);
+            n_moves[i] &= (ALL_SQUARES << idx) << 1;
             moves.push(n_orig[i].trailing_zeros() as u8);
             moves.push(idx as u8);
         }
@@ -680,33 +680,15 @@ fn generate_attacks(board: &Board) -> u64 {
         let mut capture_left: u64 = nowe(board.white & board.pawns & !A_FILE);
         let mut capture_right: u64 = noea(board.white & board.pawns & !H_FILE);
         
-        while capture_left != 0 {
-            let idx: i8 =  capture_left.trailing_zeros() as i8;
-            capture_left = ((ALL_SQUARES << idx) <<  1) & capture_left;
-            attack |= 1<<(idx as u8);
-        }
-        
-        while capture_right != 0 {
-            let idx: i8 =  capture_right.trailing_zeros() as i8;
-            capture_right = ((ALL_SQUARES << idx) << 1) & capture_right;
-            attack |= 1<<(idx as u8);
-        }
-
+        attack |= capture_left;
+        attack |= capture_right;
+    
     } else {
         let mut capture_left: u64 = sowe(board.black & board.pawns & !A_FILE);
         let mut capture_right: u64 = soea(board.black & board.pawns & !H_FILE);
         
-        while capture_left != 0 {
-            let idx: i8 =  capture_left.trailing_zeros() as i8;
-            capture_left = ((ALL_SQUARES << idx) <<  1) & capture_left;
-            attack |= 1<<(idx as u8);
-        }
-        
-        while capture_right != 0 {
-            let idx: i8 =  capture_right.trailing_zeros() as i8;
-            capture_right = ((ALL_SQUARES << idx) << 1) & capture_right;
-            attack |= 1<<(idx as u8);
-        }
+        attack |= capture_left;
+        attack |= capture_right
     }
     let mut n_orig: Vec<u64> = Vec::new();
 
@@ -813,6 +795,7 @@ pub fn load_fen(board: &mut Board, fen: &str){
     let fen_split: Vec<&str> = fen.split(' ').collect();
     let pieces: &str = fen_split[0];
     let turn: &str = fen_split[1];
+    let castle: &str = fen_split[2];
 
     let mut square: u8 = 56;
     for i in 0..pieces.len(){
@@ -829,6 +812,10 @@ pub fn load_fen(board: &mut Board, fen: &str){
     
     if turn.starts_with("w"){
         board.is_white_move = true; 
+    }
+
+    for c in castle.chars() {
+       add_castle(board, c); 
     }
     
     board.empty = !(board.black | board.white)
@@ -859,7 +846,13 @@ fn place_piece(board: &mut Board, square: u8, piece: char){
 }
 
 fn add_castle(board: &mut Board, c: char){
-    if c == 'K' {
+    match c {
+        'K'  => board.white_castle_short = true,
+        'Q'  => board.white_castle_long = true,
+        'k'  => board.black_castle_short = true,
+        'q'  => board.black_castle_long = true,
+        '-'  => return,
+        _    => todo!(),
     }
 }
 
