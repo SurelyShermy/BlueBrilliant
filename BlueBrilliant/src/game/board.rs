@@ -47,10 +47,14 @@ const BLACK_SHORT_EMPTY: u64 = 1<<61 | 1<<62;
 
 const ALL_SQUARES: u64 = 0xffffffffffffffff;
 
+const SECOND_RANK_START_IDX: u8 = 8;
+const SECOND_RANK_END_IDX: u8 = 15;
 const FOURTH_RANK_START_IDX: u8 = 24;
 const FOURTH_RANK_END_IDX: u8 = 31;
 const FIFTH_RANK_START_IDX: u8 = 32;
 const FIFTH_RANK_END_IDX: u8 = 39;
+const SEVENTH_RANK_START_IDX: u8 = 48;
+const SEVENTH_RANK_END_IDX: u8 = 55;
 
 const FILES: [char; 8] = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];    
 
@@ -77,7 +81,8 @@ pub struct Board {
     white: u64,
     black: u64,
     empty: u64,
-    en_passant: u64,
+    en_passant_white: u64,
+    en_passant_black: u64,
     white_castle_long: bool,
     white_castle_short: bool, 
     black_castle_long: bool,
@@ -96,7 +101,8 @@ pub fn create_board() -> Board {
         white: INIT_WHITE,
         black: INIT_BLACK,
         empty: !(INIT_WHITE | INIT_BLACK),
-        en_passant: 0,
+        en_passant_white: 0,
+        en_passant_black: 0,
         white_castle_long: true,
         white_castle_short: true,
         black_castle_long: true,
@@ -150,10 +156,17 @@ pub fn make_move_notation(board: &mut Board, start: String, end: String){
 //Takes a board and does a move on that board
 pub fn make_move(board: &mut Board, start: u8, end: u8) {
     if board.is_white_move {
+        board.en_passant_white = 0; 
         if FIFTH_RANK_START_IDX <= start && start <= FIFTH_RANK_END_IDX &&
-            (end-start == 7 || end-start == 9) && 
+            end > start && (end - start == 7 || end - start == 9) && 
             (board.white & board.pawns & (1<<start)) != 0{
             capture_square(board, end - 8);
+            move_square(board, start, end);
+        } else if SECOND_RANK_START_IDX <= start && start <= SECOND_RANK_END_IDX &&
+            end > start && (end - start == 16) && 
+            (board.white & board.pawns & (1<<start)) != 0 {
+            board.en_passant_white = 1<<end;
+            capture_square(board, end);
             move_square(board, start, end);
         } else if board.white_castle_long && start == 4 && end == WHITE_LONG_DEST_IDX {
             move_square(board, start, end);
@@ -166,10 +179,17 @@ pub fn make_move(board: &mut Board, start: u8, end: u8) {
             move_square(board, start, end);
         }
     } else {
+        board.en_passant_black = 0; 
         if FOURTH_RANK_START_IDX <= start && start <= FOURTH_RANK_END_IDX &&
-            (end-start == 7 || end-start == 9) && 
+            start > end && (start - end == 7 || start - end == 9) && 
             (board.white & board.pawns & (1<<start)) != 0{
             capture_square(board, end + 8);
+            move_square(board, start, end);
+        } else if SEVENTH_RANK_START_IDX <= start && start <= SEVENTH_RANK_END_IDX &&
+            start > end && (start - end == 16) && 
+            (board.black & board.pawns & (1<<start)) != 0 {
+            board.en_passant_black = 1<<end;
+            capture_square(board, end);
             move_square(board, start, end);
         } else if board.black_castle_long && start == 60 && end == BLACK_LONG_DEST_IDX {
             move_square(board, start, end);
@@ -182,7 +202,8 @@ pub fn make_move(board: &mut Board, start: u8, end: u8) {
             move_square(board, start, end);
         }
     }
-    board.is_white_move = !(board.is_white_move)
+    board.empty = !(board.white | board.black);
+    board.is_white_move = !(board.is_white_move);
 }
 
 
@@ -225,7 +246,7 @@ pub fn generate_legal_boards(board: &Board) -> Vec<Board> {
     
     for i in (0..moves.len()).step_by(2) { 
         if let Some(board) = valid_board(board, moves[i], moves[i+1]){
-            legal_board.push(board);
+            legal_boards.push(board);
         }
     }
     return legal_boards;
@@ -251,13 +272,13 @@ fn generate_pawn_moves(board: &Board, moves: &mut Vec<u8>) {
 
         while single_push != 0 {
             let idx:i8 = single_push.trailing_zeros() as i8;    
-            single_push = (ALL_SQUARES << (idx + 1)) & single_push;
+            single_push = ((ALL_SQUARES << idx) << 1) & single_push;
             moves.push((idx - NORT) as u8); //rip post increment :(
             moves.push(idx as u8);
         }
         while double_push != 0 {
             let idx:i8 = double_push.trailing_zeros() as i8;    
-            double_push = (ALL_SQUARES << (idx + 1)) & double_push;
+            double_push = ((ALL_SQUARES << idx) << 1) & double_push;
             moves.push((idx - 2*NORT) as u8);
             moves.push(idx as u8);
         }
@@ -268,21 +289,21 @@ fn generate_pawn_moves(board: &Board, moves: &mut Vec<u8>) {
         
         while capture_left != 0 {
             let idx: i8 =  capture_left.trailing_zeros() as i8;
-            capture_left = (ALL_SQUARES << (idx + 1)) & capture_left;
+            capture_left = ((ALL_SQUARES << idx) << 1) & capture_left;
             moves.push((idx - NOWE) as u8);
             moves.push(idx as u8);
         }
         
         while capture_right != 0 {
             let idx: i8 =  capture_right.trailing_zeros() as i8;
-            capture_right = (ALL_SQUARES << (idx + 1)) & capture_right;
+            capture_right = ((ALL_SQUARES << idx) << 1) & capture_right;
             moves.push((idx - NOEA) as u8);
             moves.push(idx as u8);
         }
 
         //En passant
-        let passant_left: u64 = nort((board.en_passant & board.black) & ((board.white & board.pawns) << 1));
-        let passant_right: u64 = nort((board.en_passant & board.black) & ((board.white & board.pawns) >> 1));
+        let passant_left: u64 = noea(board.white & board.pawns & !A_FILE & ((board.en_passant_black) << 1));
+        let passant_right: u64 = nowe(board.white & board.pawns & !H_FILE & ((board.en_passant_black) >> 1));
 
         if passant_left != 0 {
             let idx: i8 = passant_left.trailing_zeros() as i8;
@@ -299,9 +320,6 @@ fn generate_pawn_moves(board: &Board, moves: &mut Vec<u8>) {
          //Pushes and double pushes
         let mut single_push: u64 = sout(board.black & board.pawns) & board.empty;
         let mut double_push: u64 = sout(single_push & SIXTH_RANK) & board.empty;
-
-        println!("single_push: {:b}", single_push);
-        println!("double_push: {:b}", double_push);
 
         while single_push != 0 {
             let idx:i8 = single_push.trailing_zeros() as i8;    
@@ -335,8 +353,8 @@ fn generate_pawn_moves(board: &Board, moves: &mut Vec<u8>) {
         }
 
         //En passant
-        let passant_left: u64 = sout((board.en_passant & board.white) & ((board.black & board.pawns) << 1));
-        let passant_right: u64 = sout((board.en_passant & board.white) & ((board.black & board.pawns) >> 1));
+        let passant_left: u64 = sowe(board.black & board.pawns & !A_FILE & ((board.en_passant_white) << 1));
+        let passant_right: u64 = soea(board.black & board.pawns & !H_FILE & ((board.en_passant_white) >> 1));
 
         if passant_left != 0 {
             let idx: i8 = passant_left.trailing_zeros() as i8;
@@ -443,7 +461,7 @@ fn generate_bishop_moves(board: &Board, moves: &mut Vec<u8>) {
         let mut temp: u64 = bishops;
         while temp != 0 {
             let d_idx: u8 = temp.trailing_zeros() as u8;
-            temp &= ALL_SQUARES << (d_idx + 1);
+            temp &= (ALL_SQUARES << d_idx) << 1;
             moves.push(d_idx - 9*iter);
             moves.push(d_idx as u8);
         }
@@ -459,7 +477,7 @@ fn generate_bishop_moves(board: &Board, moves: &mut Vec<u8>) {
         let mut temp: u64 = bishops;
         while temp != 0 {
             let d_idx: u8 = temp.trailing_zeros() as u8;
-            temp &= ALL_SQUARES << (d_idx + 1);
+            temp &= (ALL_SQUARES << d_idx) << 1;
             moves.push(d_idx + 7*iter);
             moves.push(d_idx as u8);
         }
@@ -475,7 +493,7 @@ fn generate_bishop_moves(board: &Board, moves: &mut Vec<u8>) {
         let mut temp: u64 = bishops;
         while temp != 0 {
             let d_idx: u8 = temp.trailing_zeros() as u8;
-            temp &= ALL_SQUARES << (d_idx + 1);
+            temp &= (ALL_SQUARES << d_idx) << 1;
             moves.push(d_idx + 9*iter);
             moves.push(d_idx as u8);
         }
@@ -491,7 +509,7 @@ fn generate_bishop_moves(board: &Board, moves: &mut Vec<u8>) {
         let mut temp: u64 = bishops;
         while temp != 0 {
             let d_idx: u8 = temp.trailing_zeros() as u8;
-            temp &= ALL_SQUARES << (d_idx + 1);
+            temp &= (ALL_SQUARES << d_idx) << 1;
             moves.push(d_idx - 7*iter);
             moves.push(d_idx as u8);
         }
@@ -524,7 +542,11 @@ fn generate_rook_moves(board: &Board, moves: &mut Vec<u8>) {
         let mut temp: u64 = rooks;
         while temp != 0 {
             let d_idx: u8 = temp.trailing_zeros() as u8;
-            temp &= ALL_SQUARES << (d_idx + 1);
+            if d_idx == 63 {
+                temp = 0;
+            } else {
+                temp &= (ALL_SQUARES << d_idx) << 1;
+            } 
             moves.push(d_idx - 8*iter);
             moves.push(d_idx as u8);
         }
@@ -533,7 +555,7 @@ fn generate_rook_moves(board: &Board, moves: &mut Vec<u8>) {
     }
     
     //sout moves
-    rooks = attack_pieces & board.rooks;
+    rooks = attack_pieces & (board.rooks | board.queens);
     iter = 1;
     while rooks != 0 {
         rooks = sout(rooks & !FIRST_RANK) & !attack_pieces;
@@ -541,7 +563,7 @@ fn generate_rook_moves(board: &Board, moves: &mut Vec<u8>) {
         let mut temp: u64 = rooks;
         while temp != 0 {
             let d_idx: u8 = temp.trailing_zeros() as u8;
-            temp &= ALL_SQUARES << (d_idx + 1);
+            temp &= (ALL_SQUARES << d_idx) << 1;
             moves.push(d_idx + 8*iter);
             moves.push(d_idx as u8);
         }
@@ -550,7 +572,7 @@ fn generate_rook_moves(board: &Board, moves: &mut Vec<u8>) {
     }
     
     //east moves
-    rooks = attack_pieces & board.rooks;
+    rooks = attack_pieces & (board.rooks | board.queens);
     iter = 1;
     while rooks != 0 {
         rooks = east(rooks & !H_FILE) & !attack_pieces;
@@ -558,7 +580,7 @@ fn generate_rook_moves(board: &Board, moves: &mut Vec<u8>) {
         let mut temp: u64 = rooks;
         while temp != 0 {
             let d_idx: u8 = temp.trailing_zeros() as u8;
-            temp &= ALL_SQUARES << (d_idx + 1);
+            temp &= (ALL_SQUARES << d_idx) << 1;
             moves.push(d_idx - iter);
             moves.push(d_idx as u8);
         }
@@ -567,7 +589,7 @@ fn generate_rook_moves(board: &Board, moves: &mut Vec<u8>) {
     }
 
     //west moves
-    rooks= attack_pieces & board.rooks;
+    rooks= attack_pieces & (board.rooks | board.queens);
     iter = 1;
     while rooks != 0 {
         rooks = west(rooks & !A_FILE) & !attack_pieces;
@@ -575,7 +597,7 @@ fn generate_rook_moves(board: &Board, moves: &mut Vec<u8>) {
         let mut temp: u64 = rooks;
         while temp != 0 {
             let d_idx: u8 = temp.trailing_zeros() as u8;
-            temp &= ALL_SQUARES << (d_idx + 1);
+            temp &= (ALL_SQUARES << d_idx) << 1;
             moves.push(d_idx + iter);
             moves.push(d_idx as u8);
         }
@@ -621,7 +643,7 @@ fn generate_king_moves(board: &Board, moves: &mut Vec<u8>) {
                                 | sowe(king) | west(king) | nowe(king)) & !attack_pieces;
     while king_moves != 0 {
         let k_idx: u8 = king_moves.trailing_zeros() as u8;
-        king_moves &= ALL_SQUARES << (k_idx + 1);
+        king_moves &= (ALL_SQUARES << k_idx) << 1;
         moves.push(king.trailing_zeros() as u8);
         moves.push(k_idx as u8);
     }
@@ -660,13 +682,13 @@ fn generate_attacks(board: &Board) -> u64 {
         
         while capture_left != 0 {
             let idx: i8 =  capture_left.trailing_zeros() as i8;
-            capture_left = (ALL_SQUARES << (idx + 1)) & capture_left;
+            capture_left = ((ALL_SQUARES << idx) <<  1) & capture_left;
             attack |= 1<<(idx as u8);
         }
         
         while capture_right != 0 {
             let idx: i8 =  capture_right.trailing_zeros() as i8;
-            capture_right = (ALL_SQUARES << (idx + 1)) & capture_right;
+            capture_right = ((ALL_SQUARES << idx) << 1) & capture_right;
             attack |= 1<<(idx as u8);
         }
 
@@ -676,13 +698,13 @@ fn generate_attacks(board: &Board) -> u64 {
         
         while capture_left != 0 {
             let idx: i8 =  capture_left.trailing_zeros() as i8;
-            capture_left = (ALL_SQUARES << (idx + 1)) & capture_left;
+            capture_left = ((ALL_SQUARES << idx) <<  1) & capture_left;
             attack |= 1<<(idx as u8);
         }
         
         while capture_right != 0 {
             let idx: i8 =  capture_right.trailing_zeros() as i8;
-            capture_right = (ALL_SQUARES << (idx + 1)) & capture_right;
+            capture_right = ((ALL_SQUARES << idx) << 1) & capture_right;
             attack |= 1<<(idx as u8);
         }
     }

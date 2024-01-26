@@ -1,6 +1,8 @@
 pub mod board;
 use std::io;
+use std::mem;
 
+const ALL_SQUARES: u64 = 0xffffffffffffffff;
 fn main(){
     let mut board = board::create_board();
     //board::load_fen(&mut board, "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1");
@@ -28,15 +30,19 @@ fn main(){
             }
         }
     } else {
-        let num: i32 = num_str.parse().unwrap();
-        let mut current: Vec<Board> = Vec::new();
-        let mut next: Vec<Board> = Vec::new();
+        let num: i32 = choice.trim().parse().unwrap();
+        let mut current: Vec<board::Board> = Vec::new();
+        let mut next: Vec<board::Board> = Vec::new();
+        let mut count: usize = 0; 
+        current.push(board);
         for i in 0..num {
             while let Some(cur_board) = current.pop() {
-                next.extend(generate_all_boards(cur_board));
+                next.extend(board::generate_legal_boards(&cur_board));
             }
+            count = next.len();
             mem::swap(&mut current, &mut next);
             next.clear();
         }
+        println!("Generated {} positions", count); 
     }
 }
