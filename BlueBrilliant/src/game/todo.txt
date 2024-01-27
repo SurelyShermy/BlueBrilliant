@@ -10,5 +10,9 @@ DONE 8) Change board to vectors
     - just append instead of holding cur_moves
 DONE 9) Implement for black
 DONE 10) Fix the move check logic
-11) complete move logic for all moves
+DONE 11) complete move logic for all moves
 12) Test
+
+new list:
+fix castle logic eventually
+fix defending logic

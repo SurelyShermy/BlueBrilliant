@@ -1,11 +1,46 @@
 pub mod board;
+use std::env;
 use std::io;
 use std::mem;
 
-const ALL_SQUARES: u64 = 0xffffffffffffffff;
 fn main(){
+    let args: Vec<String> = env::args().collect();
+    if args.len() == 4 {
+        test_mode_moves(&args[1], &args[2], &args[3]); 
+    } else if args.len() == 3 {
+        test_mode(&args[1], &args[2]);
+    } else {
+        user_mode();
+    }
+
+  
+}
+
+fn test_mode(depth: &String, fen: &String){
     let mut board = board::create_board();
-//    board::load_fen(&mut board, "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ");
+    board::load_fen(&mut board, &fen);
+    
+    let d: u8 = match depth.parse() {
+        Ok(d) => d,
+        Err(_) => {
+            println!("Failed to parse argument to a number.");
+            return;
+        }
+    };
+    board::print_move_trees(&board, d);
+}
+    
+fn test_mode_moves(depth: &String, fen: &String, moves: &String) {
+    todo!();
+}
+
+
+fn user_mode() { 
+    let mut board = board::create_board();
+//    board::load_fen(&mut board, "nbqkbnr/1pp1pppp/8/p2pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq - 0 1");
+//    board::load_fen(&mut board, "rnbqkb1r/1ppppppp/5P2/p7/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
+//    board::load_fen(&mut board, "rnbqkbnr/1pp1pppp/3P4/p7/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
+//    board::load_fen(&mut board, "rnbqkbnr/2pppppp/p7/Pp6/8/8/1PPPPPPP/RNBQKBNR w KQkq b6 0 1");
     println!("What would you like to do m for manual or a number for depth");
     let mut choice = String::new();
     io::stdin().read_line(&mut choice).unwrap();
@@ -15,15 +50,19 @@ fn main(){
             let mut end = String::new();   
             
             io::stdin().read_line(&mut start).unwrap();
-            if start.trim().starts_with("m") {
+            if start.trim().starts_with("M") {
                 board::print_current_moves(&board);           
-            } else if start.trim().starts_with("a") {
+            } else if start.trim().starts_with("G") {
+                board::print_pseudo_moves(&board);
+            } else if start.trim().starts_with("A") {
                 board::print_attacks(&board);
-            } else if start.trim().starts_with("w") {
+            } else if start.trim().starts_with("W") {
                 board::print_white(&board);
-            } else if start.trim().starts_with("b") {
+            } else if start.trim().starts_with("B") {
                 board::print_black(&board);
-            } else if start.trim().starts_with("p") {
+            } else if start.trim().starts_with("N") {
+                board::print_knights(&board);
+            } else if start.trim().starts_with("P") {
                 board::print_board(&board);
             } else {
                 io::stdin().read_line(&mut end).unwrap();
