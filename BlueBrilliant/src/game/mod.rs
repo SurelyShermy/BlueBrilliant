@@ -1,2 +1,2 @@
-pub mod initialization;
-pub mod utilities;
+pub mod board;
+pub mod evaluation;

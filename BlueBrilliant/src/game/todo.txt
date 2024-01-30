@@ -16,3 +16,8 @@ DONE 11) complete move logic for all moves
 new list:
 fix castle logic eventually
 fix defending logic
+
+Evaluation
+
+DONE 1) Calculate Material with PESTO tables
+2) Implement 

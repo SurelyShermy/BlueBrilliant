@@ -28,7 +28,10 @@ const EIGTH_RANK: u64 = 1<<56 | 1<<57 | 1<<58 | 1<<59 | 1<<60 | 1<<61 | 1<<62 | 
 
 const A_FILE: u64 = 1<<0 | 1<<8 | 1<<16 | 1<<24 | 1<<32 | 1<<40 | 1<<48 | 1<<56;
 const B_FILE: u64 = 1<<1 | 1<<9 | 1<<17 | 1<<25 | 1<<33 | 1<<41 | 1<<49 | 1<<57;
-
+const C_FILE: u64 = 1<<2 | 1<<10 | 1<<18 | 1<<26 | 1<<34 | 1<<42 | 1<<50 | 1<<58;
+const D_FILE: u64 = 1<<3 | 1<<11 | 1<<19 | 1<<27 | 1<<35 | 1<<43 | 1<<51 | 1<<59;
+const E_FILE: u64 = 1<<4 | 1<<12 | 1<<20 | 1<<28 | 1<<36 | 1<<44 | 1<<52 | 1<<60;
+const F_FILE: u64 = 1<<5 | 1<<13 | 1<<21 | 1<<29 | 1<<37 | 1<<45 | 1<<53 | 1<<61;
 const G_FILE: u64 = 1<<6 | 1<<14 | 1<<22 | 1<<30 | 1<<38 | 1<<46 | 1<<54 | 1<<62; 
 const H_FILE: u64 = 1<<7 | 1<<15 | 1<<23 | 1<<31 | 1<<39 | 1<<47 | 1<<55 | 1<<63; 
 
@@ -47,7 +50,8 @@ const BLACK_LONG_EMPTY: u64 = 1<<57 | 1<<58 | 1<<59;
 const BLACK_SHORT_EMPTY: u64 = 1<<61 | 1<<62;
 
 const ALL_SQUARES: u64 = 0xffffffffffffffff;
-
+const NOT_A_FILE: u64 = !A_FILE;
+const NOT_H_FILE: u64 = !H_FILE;
 const SECOND_RANK_START_IDX: u8 = 8;
 const SECOND_RANK_END_IDX: u8 = 15;
 const FOURTH_RANK_START_IDX: u8 = 24;
@@ -57,6 +61,7 @@ const FIFTH_RANK_END_IDX: u8 = 39;
 const SEVENTH_RANK_START_IDX: u8 = 48;
 const SEVENTH_RANK_END_IDX: u8 = 55;
 
+const BOARD_FILES: [u64; 8] = [A_FILE, B_FILE, C_FILE, D_FILE, E_FILE, F_FILE, G_FILE, H_FILE];
 const FILES: [char; 8] = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];    
 
 
@@ -73,21 +78,21 @@ const NOWE: i8 = 7;
 
 #[derive(Clone)]
 pub struct Board {
-    pawns: u64,
-    knights: u64,
-    bishops: u64, 
-    rooks: u64,
-    queens: u64,
-    kings: u64,
-    white: u64,
-    black: u64,
-    empty: u64,
-    en_passant_target: u64,
-    white_castle_long: bool,
-    white_castle_short: bool, 
-    black_castle_long: bool,
-    black_castle_short: bool,
-    is_white_move: bool
+    pub pawns: u64,
+    pub knights: u64,
+    pub bishops: u64, 
+    pub rooks: u64,
+    pub queens: u64,
+    pub kings: u64,
+    pub white: u64,
+    pub black: u64,
+    pub empty: u64,
+    pub en_passant_target: u64,
+    pub white_castle_long: bool,
+    pub white_castle_short: bool, 
+    pub black_castle_long: bool,
+    pub black_castle_short: bool,
+    pub is_white_move: bool
 }
 
 pub fn create_board() -> Board {
@@ -304,7 +309,6 @@ pub fn generate_all_moves(board: &Board) -> Vec<u8> {
 
     return moves; 
 }
-
 
 fn generate_pawn_moves(board: &Board, moves: &mut Vec<u8>) {
     if board.is_white_move{ //convert black and white into an array of len 2 and inx into that
@@ -937,7 +941,7 @@ representing positions of pawns if moved one north.
 
 
 #[inline]
-fn nort(board: u64) -> u64 {
+pub fn nort(board: u64) -> u64 {
     return board << 8;
 }
 
@@ -957,7 +961,7 @@ fn soea(board: u64) -> u64 {
 }
 
 #[inline]
-fn sout(board: u64) -> u64 {
+pub fn sout(board: u64) -> u64 {
     return board >> 8;
 }
 
@@ -975,8 +979,24 @@ fn west(board: u64) -> u64 {
 fn nowe(board: u64) -> u64 {
     return board << 7;
 }
-
-
+pub fn east_one(board: u64) -> u64 {
+    return (board << 1) & !A_FILE;
+}
+pub fn noea_one(board: u64) -> u64 {
+    return (board << 1) & !A_FILE;
+}
+pub fn soea_one(board: u64) -> u64 {
+    return (board << 1) & !A_FILE;
+}
+pub fn west_one(board: u64) -> u64 {
+    return (board << 1) & !H_FILE;
+}
+pub fn sowe_one(board: u64) -> u64 {
+    return (board << 1) & !H_FILE;
+}
+pub fn nowe_one(board: u64) -> u64 {
+    return (board << 1) & !H_FILE;
+}
 /*
 *   Visualization and representation functions
 */
