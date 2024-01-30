@@ -34,17 +34,23 @@ const H_FILE: u64 = 1<<7 | 1<<15 | 1<<23 | 1<<31 | 1<<39 | 1<<47 | 1<<55 | 1<<63
 
 const WHITE_LONG_DEST: u64 = 1<<2;
 const WHITE_SHORT_DEST: u64 = 1<<6;
+const WHITE_KING_START_IDX: u8 = 4;
 const WHITE_LONG_DEST_IDX: u8 = 2;
 const WHITE_SHORT_DEST_IDX: u8 = 6;
 const WHITE_LONG_EMPTY: u64 = 1<<1 | 1<<2 | 1<<3;
 const WHITE_SHORT_EMPTY: u64 = 1<<5 | 1<<6;
+const WHITE_LONG_KING: u64 = 1<<2 | 1<<3 | 1<<4;
+const WHITE_SHORT_KING: u64 = 1<<4 | 1<<5 | 1<<6;
 
 const BLACK_LONG_DEST: u64 = 1<<58;
 const BLACK_SHORT_DEST: u64 = 1<<62;
+const BLACK_KING_START_IDX: u8 = 60;
 const BLACK_LONG_DEST_IDX: u8 = 58;
 const BLACK_SHORT_DEST_IDX: u8 = 62;
 const BLACK_LONG_EMPTY: u64 = 1<<57 | 1<<58 | 1<<59;
 const BLACK_SHORT_EMPTY: u64 = 1<<61 | 1<<62;
+const BLACK_LONG_KING: u64 = 1<<58 | 1<<59 | 1<<60;
+const BLACK_SHORT_KING: u64 = 1<<60 | 1<<61 | 1<<62;
 
 const ALL_SQUARES: u64 = 0xffffffffffffffff;
 
@@ -145,34 +151,125 @@ pub fn print_move_trees(board: &Board, depth: u8){
 *   king is in check at start of a castle
 */ 
 fn valid_board(old_board: &Board, start: u8, end: u8) -> Option<Board> {
-    let board: Board = simulate_move(old_board, start, end); 
+    let mut board: Board = simulate_move(old_board, start, end); 
     let attacks: u64 = generate_attacks(&board); 
-    
+    let mut moved_pieces: u64 = 0;
+   
     if old_board.is_white_move {
-        if attacks & board.white & board.kings != 0 {
-            return None;
+        if start == WHITE_KING_START_IDX {
+            board.white_castle_long = false;
+            board.white_castle_short = false;
         }
+        if start == 0 {
+            board.white_castle_long = false;
+        }
+        if start == 7 {
+            board.white_castle_short = false;
+        }
+        if end == 56 {
+            board.black_castle_long = false;
+        }
+        if end == 63 {
+            board.black_castle_short = false;
+        }
+
+        if old_board.white_castle_long && start == WHITE_KING_START_IDX && end == WHITE_LONG_DEST_IDX {
+            if attacks & WHITE_LONG_KING != 0 { 
+                return None;
+            } else {
+                return Some(board);
+            }
+        }
+        if old_board.white_castle_short && start == WHITE_KING_START_IDX && end == WHITE_SHORT_DEST_IDX {
+            if attacks & WHITE_SHORT_KING != 0 {
+                return None;
+            } else { 
+                return Some(board);
+            }
+        }
+        moved_pieces = board.white;
     } else {
-        if attacks & board.black & board.kings != 0 {
-            return None;
+        if start == BLACK_KING_START_IDX {
+            board.black_castle_long = false;
+            board.black_castle_short = false;
         }
+        if start == 56 {
+            board.black_castle_long = false;
+        }
+        if start == 63 {
+            board.black_castle_short = false;
+        }
+        if end == 0 {
+            board.white_castle_long = false;
+        }
+        if end == 7 {
+            board.white_castle_short = false;
+        }
+        
+        if old_board.white_castle_long && start == WHITE_KING_START_IDX && end == WHITE_LONG_DEST_IDX {
+            if attacks & WHITE_LONG_KING != 0 { 
+                return None;
+            } else {
+                return Some(board);
+            }
+        }
+        if old_board.black_castle_short && start == BLACK_KING_START_IDX && end == BLACK_SHORT_DEST_IDX {
+            if attacks & BLACK_SHORT_KING != 0 {
+                return None;
+            } else { 
+                return Some(board);
+            }
+        } 
+        moved_pieces = board.black;
     }
+    if attacks & moved_pieces & board.kings != 0 {
+        return None;
+    }    
     return Some(board);
 }
 
 fn valid_move(old_board: &Board, start: u8, end: u8) -> bool {
     let board: Board = simulate_move(old_board, start, end); 
     let attacks: u64 = generate_attacks(&board); 
+    let mut moved_pieces: u64 = 0;
     
+
     if old_board.is_white_move {
-        if attacks & board.white & board.kings != 0 {
-            return false;
+        if old_board.white_castle_long && start == WHITE_KING_START_IDX && end == WHITE_LONG_DEST_IDX {
+            if attacks & WHITE_LONG_KING != 0 { 
+                return false;
+            } else {
+                return true;
+            }
         }
+        if old_board.white_castle_short && start == WHITE_KING_START_IDX && end == WHITE_SHORT_DEST_IDX {
+            if attacks & WHITE_SHORT_KING != 0 {
+                return false;
+            } else { 
+                return true;
+            }
+        }
+        moved_pieces = board.white;
     } else {
-        if attacks & board.black & board.kings != 0 {
-            return false;
+        if old_board.white_castle_long && start == WHITE_KING_START_IDX && end == WHITE_LONG_DEST_IDX {
+            if attacks & WHITE_LONG_KING != 0 { 
+                return false;
+            } else {
+                return true;
+            }
         }
+        if old_board.black_castle_short && start == BLACK_KING_START_IDX && end == BLACK_SHORT_DEST_IDX {
+            if attacks & BLACK_SHORT_KING != 0 {
+                return false;
+            } else { 
+                return true;
+            }
+        } 
+        moved_pieces = board.black;
     }
+    if attacks & moved_pieces & board.kings != 0 {
+        return false;
+    }    
     return true;
 }
 
@@ -196,13 +293,13 @@ pub fn make_move(board: &mut Board, start: u8, end: u8) {
                 board.en_passant_target = (1<<end)>>8;
                 capture_square(board, end);
                 move_square(board, start, end);
-            }/* else if board.white_castle_long && start == 4 && end == WHITE_LONG_DEST_IDX {
+            } else if board.white_castle_long && start == WHITE_KING_START_IDX && end == WHITE_LONG_DEST_IDX {
                 move_square(board, start, end);
                 move_square(board, 0, 3);
-            } else if board.white_castle_short && start == 4 && end == WHITE_SHORT_DEST_IDX {
+            } else if board.white_castle_short && start == WHITE_KING_START_IDX && end == WHITE_SHORT_DEST_IDX {
                 move_square(board, start, end);
                 move_square(board, 7, 5);
-            }*/ else {
+            } else {
                 capture_square(board, end);
                 move_square(board, start, end);
             }
@@ -219,13 +316,13 @@ pub fn make_move(board: &mut Board, start: u8, end: u8) {
                 board.en_passant_target = (1<<end)<<8;
                 capture_square(board, end);
                 move_square(board, start, end);
-            }/* else if board.black_castle_long && start == 60 && end == BLACK_LONG_DEST_IDX {
+            } else if board.black_castle_long && start == BLACK_KING_START_IDX && end == BLACK_LONG_DEST_IDX {
                 move_square(board, start, end);
                 move_square(board, 56, 59);
-            } else if board.black_castle_short && start == 60 && end == BLACK_SHORT_DEST_IDX {
+            } else if board.black_castle_short && start == BLACK_KING_START_IDX && end == BLACK_SHORT_DEST_IDX {
                 move_square(board, start, end);
                 move_square(board, 63, 61);
-            }*/ else {
+            } else {
                 capture_square(board, end);
                 move_square(board, start, end);
             }
@@ -655,7 +752,7 @@ fn generate_king_moves(board: &Board, moves: &mut Vec<u8>) {
         king = board.white & board.kings;
         attack_pieces = board.white;
         defend_pieces = board.black;
-        
+       
         if board.white_castle_long && (WHITE_LONG_EMPTY & board.empty) == WHITE_LONG_EMPTY {
             moves.push(king.trailing_zeros() as u8);
             moves.push(WHITE_LONG_DEST_IDX);
@@ -673,7 +770,7 @@ fn generate_king_moves(board: &Board, moves: &mut Vec<u8>) {
             moves.push(king.trailing_zeros() as u8);
             moves.push(BLACK_LONG_DEST_IDX);
         }
-        if board.black_castle_long && (BLACK_SHORT_EMPTY & board.empty) == BLACK_SHORT_EMPTY {
+        if board.black_castle_short && (BLACK_SHORT_EMPTY & board.empty) == BLACK_SHORT_EMPTY {
             moves.push(king.trailing_zeros() as u8);
             moves.push(BLACK_SHORT_DEST_IDX);
         }
