@@ -229,6 +229,7 @@ pub fn evaluate_board(board: &Board) -> i32 {
 
   score
 }
+
 pub fn calculate_material(board: &Board) -> i32 {
   //These numbers are based on pesto game phase increment count
   let knight = 1;
@@ -348,6 +349,7 @@ pub fn calculate_pawn_structure(board: &Board, egphase: i32) -> i32 {
   score += wpassed_pawns * multiplier;
   score -= bpassed_pawns * multiplier;
   //TODO: Add more pawn structure evaluation
+
   score
 }
 
@@ -417,3 +419,40 @@ pub fn rook_on_semi_open_file(board: &Board) -> i32 {
   score
 }
 
+pub fn ab_pruning(board: &Board, alpha: i32, beta: i32, mve: u32, depth: u32, maximizing_player: bool) -> [i32; 2] {
+  if depth == 0 {
+    return [evaluate_board(board) as i32, mve as i32];
+  }
+  let mut moves = generate_all_moves(board);
+  if maximizing_player {
+    let mut value: i32 = f64::NEG_INFINITY as i32;
+    for i in 0..moves.len() {
+      let new_board = simulate_move(board, moves[i]);
+      let [score,_] = ab_pruning(&new_board, alpha, beta, moves[i], depth - 1, false);
+      if score > value {
+        value = score;
+        let best_move = moves[i];
+      }
+      alpha = alpha.max(best_score);
+      if value >= beta {
+        break;
+      }
+
+    }
+    return [value, best_move]
+  } else {
+    let mut value = f64::INFINITY as i32;
+    for i in 0..moves.len() {
+      let new_board = simulate_move(board, moves[i]);
+      let [score_] = ab_pruning(&new_board, alpha, beta, moves[i], depth - 1, true)[0];
+      if score < value {
+        value = score;
+        best_move = moves[i];
+      }
+      beta = beta.min(best_score);
+      if value <= alpha {
+        break;
+      }
+    }
+  }
+}

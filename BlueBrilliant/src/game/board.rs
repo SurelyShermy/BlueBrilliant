@@ -242,7 +242,7 @@ pub fn make_move(board: &mut Board, start: u8, end: u8) {
 
 
 //Takes a board and returns a different board as if the move had been made on the first board
-fn simulate_move(board: &Board, start: u8, end: u8) -> Board {
+pub fn simulate_move(board: &Board, start: u8, end: u8) -> Board {
     let mut next_board: Board = board.clone();
     make_move(&mut next_board, start, end);
     return next_board;
