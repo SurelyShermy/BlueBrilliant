@@ -221,11 +221,11 @@ pub fn evaluate_board(board: &Board) -> i32 {
   score += calculate_pawn_structure(board, 0);
   score += calculate_king_safety(board);
   //IF both sides need to have their mobility calculated, then it would perhaps require the board to be mutable to flip the side to move? is it worth it?
-  //score += calculate_mobility(board);
+  score += calculate_mobility(board);
   score += calculate_bishop_pair(board);
 
-  // score += rook_on_open_file(board);
-  // score += rook_on_semi_open_file(board);
+  score += rook_on_open_file(board);
+  score += rook_on_semi_open_file(board);
 
   score
 }
@@ -356,15 +356,6 @@ pub fn calculate_pawn_structure(board: &Board, egphase: i32) -> i32 {
 pub fn calculate_king_safety(board: &Board) -> i32 {
   let mut score: i32 = 0;
 
-  score
-}
-
-pub fn calculate_mobility(board: &Board) -> i32 {
-  let mobility_multiplier: i32 = 5;
-  let mut score: i32 = 0;
-  score += generate_all_moves(board).len() as i32 * mobility_multiplier;
-  //If we decide that board can be allowed to be mutable, then board.is_white_move = !board.is_white_move;
-  //score -= generate_all_moves(board).len() as i32 * mobility_multiplier;
   score
 }
 

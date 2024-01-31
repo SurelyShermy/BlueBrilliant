@@ -285,6 +285,17 @@ pub fn generate_legal_moves(board: &Board) -> Vec<u8> {
     return legal_moves;
 }
 
+pub fn calculate_mobility(board: & mut Board) -> i32 {
+    let mobility_multiplier: i32 = 5;
+    let mut score: i32 = 0;
+    score += generate_legal_moves(board).len() as i32 * mobility_multiplier;
+    board.is_white_move = !board.is_white_move;
+    score -= generate_legal_moves(board).len() as i32 * mobility_multiplier;
+    //If we decide that board can be allowed to be mutable, then board.is_white_move = !board.is_white_move;
+    //score -= generate_all_moves(board).len() as i32 * mobility_multiplier;
+    score
+}
+
 pub fn generate_legal_boards(board: &Board) -> Vec<Board> {
     let mut moves: Vec<u8> = generate_all_moves(board);
     let mut legal_boards: Vec<Board> = Vec::new();
