@@ -233,7 +233,7 @@ fn valid_board(old_board: &Board, start: u8, end: u8) -> Option<Board> {
     return Some(board);
 }
 
-fn valid_move(old_board: &Board, start: u8, end: u8) -> bool {
+pub fn valid_move(old_board: &Board, start: u8, end: u8) -> bool {
     let board: Board = simulate_move(old_board, start, end); 
     let attacks: u64 = generate_attacks(&board); 
     let mut moved_pieces: u64 = 0;
@@ -282,7 +282,13 @@ fn valid_move(old_board: &Board, start: u8, end: u8) -> bool {
 pub fn make_move_notation(board: &mut Board, start: String, end: String){
     make_move(board, map_notation(start), map_notation(end));
 }
-
+fn is_capture(board: &Board, index: u8) -> bool {
+    if board.is_white_move {
+        return (1<<index) & board.black != 0;
+    } else {
+        return (1<<index) & board.white != 0;
+    }
+}
 //Takes a board and does a move on that board
 pub fn make_move(board: &mut Board, start: u8, end: u8) {
     if board.is_white_move {
@@ -372,14 +378,42 @@ pub fn print_pseudo_moves(board: &Board) {
 pub fn generate_legal_moves(board: &Board) -> Vec<u8> {
     let mut moves: Vec<u8> = generate_all_moves(board);
     let mut legal_moves: Vec<u8> = Vec::new();
+    let mut captures: Vec<u8> = Vec::new();
     
     for i in (0..moves.len()).step_by(2) { 
         if valid_move(board, moves[i], moves[i+1]){
-            legal_moves.push(moves[i]);
-            legal_moves.push(moves[i+1]);
+            if(is_capture(board, moves[i+1])){
+                captures.push(moves[i]);
+                captures.push(moves[i+1]);
+            } else {
+                legal_moves.push(moves[i]);
+                legal_moves.push(moves[i+1]);
+            }
         }
     }
-    return legal_moves;
+    captures.append(&mut legal_moves);
+    return captures;
+}
+//WARNING THIS DOES NOT CHECK FOR STALEMATE TODO
+
+pub fn is_checkmate(board: &mut Board) -> bool {
+    let moves: Vec<u8> = generate_legal_moves(board);
+    let king: u8 = king_position(board);
+    board.is_white_move = !board.is_white_move;
+    let mut attacks: u64 = generate_attacks(board);
+    attacks &= (1<<king);
+    board.is_white_move = !board.is_white_move;
+    return (moves.len() == 0 && attacks != 0);
+}
+pub fn calculate_mobility(board: & mut Board) -> i32 {
+    let mobility_multiplier: i32 = 5;
+    let mut score: i32 = 0;
+    score += generate_all_moves(board).len() as i32 * mobility_multiplier;
+    board.is_white_move = !board.is_white_move;
+    score -= generate_all_moves(board).len() as i32 * mobility_multiplier;
+    board.is_white_move = !board.is_white_move;
+
+    score
 }
 
 pub fn generate_legal_boards(board: &Board) -> Vec<Board> {
@@ -796,7 +830,13 @@ fn generate_king_moves(board: &Board, moves: &mut Vec<u8>) {
     
    
 }
-
+fn king_position(board: &Board) -> u8 {
+    if board.is_white_move {
+        return (board.kings & board.white).trailing_zeros() as u8;
+    } else {
+        return (board.kings & board.black).trailing_zeros() as u8;
+    }
+}
 pub fn print_attacks(board: &Board) {
     print_bit_board(generate_attacks(board));
 }
@@ -848,7 +888,7 @@ fn generate_attacks(board: &Board) -> u64 {
     while knights != 0 {
         prev_idx = knights.trailing_zeros() as u8;
         n_orig.push(1 << prev_idx);
-        knights &= ALL_SQUARES << (prev_idx + 1);
+        knights &= ALL_SQUARES << (prev_idx) << 1;
     }
     
     for i in 0..n_orig.len(){

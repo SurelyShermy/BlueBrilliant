@@ -21,7 +21,7 @@ fn main(){
 fn evaluation_test(fen: &String) {
     let mut board = board::create_board();
     board::load_fen(&mut board, &fen);
-    println!("Eval: {}", evaluation::evaluate_board(&board));
+    println!("Eval: {}", evaluation::evaluate_board(&mut board));
 }
 fn test_mode(depth: &String, fen: &String){
     let mut board = board::create_board();
