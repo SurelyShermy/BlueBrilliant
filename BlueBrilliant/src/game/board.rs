@@ -282,6 +282,8 @@ pub fn valid_move(old_board: &Board, start: u8, end: u8) -> bool {
 pub fn make_move_notation(board: &mut Board, start: String, end: String){
     make_move(board, map_notation(start), map_notation(end));
 }
+
+#[inline]
 fn is_capture(board: &Board, index: u8) -> bool {
     if board.is_white_move {
         return (1<<index) & board.black != 0;
@@ -394,19 +396,14 @@ pub fn generate_legal_moves(board: &Board) -> Vec<u8> {
     captures.append(&mut legal_moves);
     return captures;
 }
-//WARNING THIS DOES NOT CHECK FOR STALEMATE TODO
 
-pub fn is_checkmate(board: &mut Board) -> bool {
+pub fn is_check(board: &mut Board) -> bool {
     board.is_white_move = !board.is_white_move;
     let mut attacks: u64 = generate_attacks(board);
     board.is_white_move = !board.is_white_move;
     let king: u8 = king_position(board);
     attacks &= (1<<king);
-    if attacks == 0 {
-        return false;
-    }
-    let moves: Vec<u8> = generate_legal_moves(board); 
-    return (moves.len() == 0 && attacks != 0);
+    return attacks != 0;
 }
 pub fn calculate_mobility(board: & mut Board) -> i32 {
     let mobility_multiplier: i32 = 5;

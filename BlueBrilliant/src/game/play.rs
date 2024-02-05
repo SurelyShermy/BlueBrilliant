@@ -55,9 +55,9 @@ fn main(){
             board::make_move(&mut board, best_move.0, best_move.1);
             board::print_board(&board);
         }
-        if(board::is_checkmate(&mut board)){
-            println!("Checkmate");
-            break;
-        }
+        // if(board::is_checkmate(&mut board)){
+        //     println!("Checkmate");
+        //     break;
+        // }
     }
 }

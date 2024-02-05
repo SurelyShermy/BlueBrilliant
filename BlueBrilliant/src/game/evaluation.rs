@@ -682,6 +682,17 @@ pub fn ab_pruning(board: &mut Board, initial_alpha: i32, initial_beta: i32, mve:
   }
 
   let moves = generate_legal_moves(board);
+  if moves.len() == 0 {
+      if is_check(board) {
+          if maximizing_player {
+              return (i32::MIN + depth as i32, mve, node_count);
+          } else {
+              return (i32::MAX - depth as i32, mve, node_count);
+          }
+      } else {
+          return (0, mve, node_count);
+      }
+  }
   let mut best_move = mve;
   if maximizing_player {
       let mut value = i32::MIN;
@@ -689,11 +700,11 @@ pub fn ab_pruning(board: &mut Board, initial_alpha: i32, initial_beta: i32, mve:
 
       for i in (0..moves.len()).step_by(2) {
           let mut new_board: Board = simulate_move(board, moves[i], moves[i + 1]);
-          if is_checkmate(&mut new_board) {
-              value = i32::MAX - depth as i32;
-              best_move = (moves[i], moves[i + 1]);
-              break;
-          }
+          // if is_checkmate(&mut new_board) {
+          //     value = i32::MAX - depth as i32;
+          //     best_move = (moves[i], moves[i + 1]);
+          //     break;
+          // }
           //TODO: ADD STALEMATE
 
           let (score, _, child_node_count) = ab_pruning(&mut new_board, alpha, initial_beta, (moves[i], moves[i + 1]), depth - 1, false);
@@ -715,11 +726,11 @@ pub fn ab_pruning(board: &mut Board, initial_alpha: i32, initial_beta: i32, mve:
 
       for i in (0..moves.len()).step_by(2) {
           let mut new_board = simulate_move(board, moves[i], moves[i + 1]);
-          if is_checkmate(&mut new_board) {
-              value = i32::MIN + depth as i32;
-              best_move = (moves[i], moves[i + 1]);
-              break;
-          }
+          // if is_checkmate(&mut new_board) {
+          //     value = i32::MIN + depth as i32;
+          //     best_move = (moves[i], moves[i + 1]);
+          //     break;
+          // }
           //TODO: ADD STALEMATE
 
           let (score, _, child_node_count) = ab_pruning(&mut new_board, initial_alpha, beta, (moves[i], moves[i + 1]), depth - 1, true);
