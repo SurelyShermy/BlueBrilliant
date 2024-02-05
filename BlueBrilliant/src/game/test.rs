@@ -1,5 +1,5 @@
 pub mod board;
-pub mod evaluation;
+//pub mod evaluation;
 use std::env;
 use std::io;
 use std::mem;
@@ -11,7 +11,7 @@ fn main(){
     } else if args.len() == 3 {
         test_mode(&args[1], &args[2]);
     } else if args.len() == 2 {
-        evaluation_test(&args[1]);
+  //      evaluation_test(&args[1]);
     } else {
         user_mode();
     }
@@ -21,7 +21,7 @@ fn main(){
 fn evaluation_test(fen: &String) {
     let mut board = board::create_board();
     board::load_fen(&mut board, &fen);
-    println!("Eval: {}", evaluation::evaluate_board(&mut board));
+//    println!("Eval: {}", evaluation::evaluate_board(&board));
 }
 fn test_mode(depth: &String, fen: &String){
     let mut board = board::create_board();
