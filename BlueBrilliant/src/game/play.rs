@@ -11,7 +11,7 @@ fn main(){
     if args.len() == 2 {
         board::load_fen(&mut board, args[1].as_str());
     }
-    let depth = 7;
+    let depth = 8;
     while true {
         while board.is_white_move {
             let mut start = String::new();
