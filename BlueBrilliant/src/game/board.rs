@@ -397,12 +397,15 @@ pub fn generate_legal_moves(board: &Board) -> Vec<u8> {
 //WARNING THIS DOES NOT CHECK FOR STALEMATE TODO
 
 pub fn is_checkmate(board: &mut Board) -> bool {
-    let moves: Vec<u8> = generate_legal_moves(board);
-    let king: u8 = king_position(board);
     board.is_white_move = !board.is_white_move;
     let mut attacks: u64 = generate_attacks(board);
-    attacks &= (1<<king);
     board.is_white_move = !board.is_white_move;
+    let king: u8 = king_position(board);
+    attacks &= (1<<king);
+    if attacks == 0 {
+        return false;
+    }
+    let moves: Vec<u8> = generate_legal_moves(board); 
     return (moves.len() == 0 && attacks != 0);
 }
 pub fn calculate_mobility(board: & mut Board) -> i32 {
