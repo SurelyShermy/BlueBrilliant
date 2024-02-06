@@ -481,13 +481,12 @@ pub fn evaluate_board(board: & mut Board) -> i32 {
   //Perhaps calculate material can also pass the eg phase to allow for phase tapering
 
   [score, egPhase] = calculate_material(board);
-  // score += calculate_pawn_structure(board, egPhase);
+  score += calculate_pawn_structure(board, egPhase);
   // score += calculate_king_safety(board);
-  // score += calculate_mobility(board);
-  // score += calculate_bishop_pair(board);
+  score += calculate_bishop_pair(board);
 
-  // score += rook_on_open_file(board);
-  // score += rook_on_semi_open_file(board);
+  score += rook_on_open_file(board);
+  score += rook_on_semi_open_file(board);
 
   score
 }
@@ -700,12 +699,7 @@ pub fn ab_pruning(board: &mut Board, initial_alpha: i32, initial_beta: i32, mve:
 
       for i in (0..moves.len()).step_by(2) {
           let mut new_board: Board = simulate_move(board, moves[i], moves[i + 1]);
-          // if is_checkmate(&mut new_board) {
-          //     value = i32::MAX - depth as i32;
-          //     best_move = (moves[i], moves[i + 1]);
-          //     break;
-          // }
-          //TODO: ADD STALEMATE
+
 
           let (score, _, child_node_count) = ab_pruning(&mut new_board, alpha, initial_beta, (moves[i], moves[i + 1]), depth - 1, false);
           node_count += child_node_count;
@@ -726,12 +720,6 @@ pub fn ab_pruning(board: &mut Board, initial_alpha: i32, initial_beta: i32, mve:
 
       for i in (0..moves.len()).step_by(2) {
           let mut new_board = simulate_move(board, moves[i], moves[i + 1]);
-          // if is_checkmate(&mut new_board) {
-          //     value = i32::MIN + depth as i32;
-          //     best_move = (moves[i], moves[i + 1]);
-          //     break;
-          // }
-          //TODO: ADD STALEMATE
 
           let (score, _, child_node_count) = ab_pruning(&mut new_board, initial_alpha, beta, (moves[i], moves[i + 1]), depth - 1, true);
           node_count += child_node_count;
