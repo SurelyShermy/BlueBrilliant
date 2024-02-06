@@ -5,7 +5,6 @@ use std::io;
 use std::mem;
 
 fn main(){
-    print!("{}", mem::size_of::<board::Board>());
     let args: Vec<String> = env::args().collect();
     if args.len() == 4 {
         test_mode_moves(&args[1], &args[2], &args[3]); 
@@ -73,6 +72,8 @@ fn user_mode() {
                 board::print_knights(&board);
             } else if start.trim().starts_with("P") {
                 board::print_board(&board);
+            } else if start.trim().starts_with("E") {
+                board::print_en(&board);
             } else {
                 io::stdin().read_line(&mut end).unwrap();
                 board::make_move_notation(&mut board, start.clone(), end.clone());

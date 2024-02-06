@@ -322,7 +322,7 @@ pub fn make_move(board: &mut Board, start: u8, end: u8) {
             board.en_passant_target = 0;
             if SEVENTH_RANK_START_IDX <= start && start <= SEVENTH_RANK_END_IDX &&
               start > end && (start - end == 16) && (board.black & board.pawns & (1<<start)) != 0 {
-                board.en_passant_target = end-8;
+                board.en_passant_target = end+8;
                 capture_square(board, end);
                 move_square(board, start, end);
             } else if board.black_castle_long && start == BLACK_KING_START_IDX && end == BLACK_LONG_DEST_IDX {
@@ -437,10 +437,11 @@ pub fn generate_all_moves(board: &Board) -> Vec<u8> {
 }
 
 fn generate_pawn_moves(board: &Board, moves: &mut Vec<u8>) {
+    let empty = !(board.black | board.white);
     if board.is_white_move{ //convert black and white into an array of len 2 and inx into that
         //Pushes and double pushes
-        let mut single_push: u64 = nort(board.white & board.pawns) & !(board.black | board.white);
-        let mut double_push: u64 = nort(single_push & THIRD_RANK) & !(board.black | board.white);
+        let mut single_push: u64 = nort(board.white & board.pawns) & empty;
+        let mut double_push: u64 = nort(single_push & THIRD_RANK) & empty;
 
         while single_push != 0 {
             let idx:i8 = single_push.trailing_zeros() as i8;    
@@ -456,8 +457,8 @@ fn generate_pawn_moves(board: &Board, moves: &mut Vec<u8>) {
         }
 
         //Captures
-        let mut capture_left: u64 = nowe(board.white & board.pawns & !A_FILE) & !(board.black | board.white);
-        let mut capture_right: u64 = noea(board.white & board.pawns & !H_FILE) & !(board.black | board.white);
+        let mut capture_left: u64 = nowe(board.white & board.pawns & !A_FILE) & board.black;
+        let mut capture_right: u64 = noea(board.white & board.pawns & !H_FILE) & board.black;
         
         while capture_left != 0 {
             let idx: i8 =  capture_left.trailing_zeros() as i8;
@@ -490,8 +491,8 @@ fn generate_pawn_moves(board: &Board, moves: &mut Vec<u8>) {
         }
     } else {
          //Pushes and double pushes
-        let mut single_push: u64 = sout(board.black & board.pawns) & !(board.black | board.white);
-        let mut double_push: u64 = sout(single_push & SIXTH_RANK) & !(board.black | board.white);
+        let mut single_push: u64 = sout(board.black & board.pawns) & empty;
+        let mut double_push: u64 = sout(single_push & SIXTH_RANK) & empty;
 
         while single_push != 0 {
             let idx:i8 = single_push.trailing_zeros() as i8;    
@@ -507,8 +508,8 @@ fn generate_pawn_moves(board: &Board, moves: &mut Vec<u8>) {
         }
 
         //Captures
-        let mut capture_left: u64 = sowe(board.black & board.pawns & !A_FILE) & !(board.black | board.white);
-        let mut capture_right: u64 = soea(board.black & board.pawns & !H_FILE) & !(board.black | board.white);
+        let mut capture_left: u64 = sowe(board.black & board.pawns & !A_FILE) & board.white;
+        let mut capture_right: u64 = soea(board.black & board.pawns & !H_FILE) & board.white;
         
         while capture_left != 0 {
             let idx: i8 =  capture_left.trailing_zeros() as i8;
@@ -848,6 +849,12 @@ pub fn print_white(board: &Board) {
 pub fn print_knights(board: &Board) {
     print_bit_board(board.knights);
 }
+
+pub fn print_en(board: &Board) {
+    print_bit_board(1<<board.en_passant_target);
+}
+
+
 
 fn generate_attacks(board: &Board) -> u64 { 
     let mut attack: u64 = 0;
