@@ -290,7 +290,7 @@ fn is_capture(board: &Board, index: u8) -> bool {
 //Takes a board and does a move on that board
 pub fn make_move(board: &mut Board, start: u8, end: u8) {
     if board.is_white_move {
-        if  1<<start & board.white & board.pawns != 0 && (1<<board.en_passant_target) & 1<<end != 0 {
+        if  1<<start & board.white & board.pawns != 0 && board.en_passant_target == end && end != 0 {
             capture_square(board, end - 8);
             move_square(board, start, end);
             board.en_passant_target = 0;
@@ -314,7 +314,7 @@ pub fn make_move(board: &mut Board, start: u8, end: u8) {
             }
         }
     } else {
-        if  1<<start & board.black & board.pawns != 0 && (1<<board.en_passant_target) & 1<<end != 0 {
+        if  1<<start & board.black & board.pawns != 0 && board.en_passant_target == end && end != 0 {
             capture_square(board, end + 8);
             move_square(board, start, end);
             board.en_passant_target = 0;
@@ -379,7 +379,7 @@ pub fn generate_legal_moves(board: &Board) -> Vec<u8> {
     
     for i in (0..moves.len()).step_by(2) { 
         if valid_move(board, moves[i], moves[i+1]){
-            if(is_capture(board, moves[i+1])){
+            if is_capture(board, moves[i+1]) {
                 captures.push(moves[i]);
                 captures.push(moves[i+1]);
             } else {
