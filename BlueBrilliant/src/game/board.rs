@@ -5,8 +5,8 @@ const INIT_PAWNS: u64 = 1<<8 | 1<<9 | 1<<10 | 1<<11 | 1<<12 | 1<<13 | 1<<14 | 1<
                         | 1<<48 | 1<<49 | 1<<50 | 1<<51 | 1<<52 | 1<<53 | 1<<54 | 1<<55;
 
 const INIT_KNIGHTS: u64 = 1<<1 | 1<<6 | 1<<57 | 1<<62;
-const INIT_BISHOPS: u64 = 1<<2 | 1<<5 | 1<<58 | 1<<61;
-const INIT_ROOKS: u64 = 1<<0 | 1<<7 | 1<<56 | 1<<63;
+const INIT_BISHOPS: u64 = 1<<2 | 1<<5 | 1<<58 | 1<<61 | 1<<3 | 1<<59;
+const INIT_ROOKS: u64 = 1<<0 | 1<<7 | 1<<56 | 1<<63 | 1<<3 | 1<<59;
 const INIT_QUEENS: u64 = 1<<3 | 1<<59;
 const INIT_KINGS: u64 = 1<<4 | 1<<60;
 
@@ -88,12 +88,10 @@ pub struct Board {
     pub knights: u64,
     pub bishops: u64, 
     pub rooks: u64,
-    pub queens: u64,
     pub kings: u64,
     pub white: u64,
     pub black: u64,
-    pub empty: u64,
-    pub en_passant_target: u64,
+    pub en_passant_target: u8,
     pub white_castle_long: bool,
     pub white_castle_short: bool, 
     pub black_castle_long: bool,
@@ -107,11 +105,9 @@ pub fn create_board() -> Board {
         knights: INIT_KNIGHTS,
         bishops: INIT_BISHOPS, 
         rooks: INIT_ROOKS,
-        queens: INIT_QUEENS,
         kings: INIT_KINGS,
         white: INIT_WHITE,
         black: INIT_BLACK,
-        empty: !(INIT_WHITE | INIT_BLACK),
         en_passant_target: 0,
         white_castle_long: true,
         white_castle_short: true,
@@ -294,7 +290,7 @@ fn is_capture(board: &Board, index: u8) -> bool {
 //Takes a board and does a move on that board
 pub fn make_move(board: &mut Board, start: u8, end: u8) {
     if board.is_white_move {
-        if  1<<start & board.white & board.pawns != 0 && board.en_passant_target & 1<<end != 0 {
+        if  1<<start & board.white & board.pawns != 0 && (1<<board.en_passant_target) & 1<<end != 0 {
             capture_square(board, end - 8);
             move_square(board, start, end);
             board.en_passant_target = 0;
@@ -303,7 +299,7 @@ pub fn make_move(board: &mut Board, start: u8, end: u8) {
             
             if SECOND_RANK_START_IDX <= start && start <= SECOND_RANK_END_IDX &&
               end > start && (end - start == 16) && (board.white & board.pawns & (1<<start)) != 0 {
-                board.en_passant_target = (1<<end)>>8;
+                board.en_passant_target = end-8;
                 capture_square(board, end);
                 move_square(board, start, end);
             } else if board.white_castle_long && start == WHITE_KING_START_IDX && end == WHITE_LONG_DEST_IDX {
@@ -318,7 +314,7 @@ pub fn make_move(board: &mut Board, start: u8, end: u8) {
             }
         }
     } else {
-        if  1<<start & board.black & board.pawns != 0 && board.en_passant_target & 1<<end != 0 {
+        if  1<<start & board.black & board.pawns != 0 && (1<<board.en_passant_target) & 1<<end != 0 {
             capture_square(board, end + 8);
             move_square(board, start, end);
             board.en_passant_target = 0;
@@ -326,7 +322,7 @@ pub fn make_move(board: &mut Board, start: u8, end: u8) {
             board.en_passant_target = 0;
             if SEVENTH_RANK_START_IDX <= start && start <= SEVENTH_RANK_END_IDX &&
               start > end && (start - end == 16) && (board.black & board.pawns & (1<<start)) != 0 {
-                board.en_passant_target = (1<<end)<<8;
+                board.en_passant_target = end-8;
                 capture_square(board, end);
                 move_square(board, start, end);
             } else if board.black_castle_long && start == BLACK_KING_START_IDX && end == BLACK_LONG_DEST_IDX {
@@ -341,7 +337,6 @@ pub fn make_move(board: &mut Board, start: u8, end: u8) {
             }
         }
     }
-    board.empty = !(board.white | board.black);
     board.is_white_move = !(board.is_white_move);
 }
 
@@ -402,7 +397,7 @@ pub fn is_check(board: &mut Board) -> bool {
     let mut attacks: u64 = generate_attacks(board);
     board.is_white_move = !board.is_white_move;
     let king: u8 = king_position(board);
-    attacks &= (1<<king);
+    attacks &= 1<<king;
     return attacks != 0;
 }
 pub fn calculate_mobility(board: & mut Board) -> i32 {
@@ -444,8 +439,8 @@ pub fn generate_all_moves(board: &Board) -> Vec<u8> {
 fn generate_pawn_moves(board: &Board, moves: &mut Vec<u8>) {
     if board.is_white_move{ //convert black and white into an array of len 2 and inx into that
         //Pushes and double pushes
-        let mut single_push: u64 = nort(board.white & board.pawns) & board.empty;
-        let mut double_push: u64 = nort(single_push & THIRD_RANK) & board.empty;
+        let mut single_push: u64 = nort(board.white & board.pawns) & !(board.black | board.white);
+        let mut double_push: u64 = nort(single_push & THIRD_RANK) & !(board.black | board.white);
 
         while single_push != 0 {
             let idx:i8 = single_push.trailing_zeros() as i8;    
@@ -461,8 +456,8 @@ fn generate_pawn_moves(board: &Board, moves: &mut Vec<u8>) {
         }
 
         //Captures
-        let mut capture_left: u64 = nowe(board.white & board.pawns & !A_FILE) & board.black;
-        let mut capture_right: u64 = noea(board.white & board.pawns & !H_FILE) & board.black;
+        let mut capture_left: u64 = nowe(board.white & board.pawns & !A_FILE) & !(board.black | board.white);
+        let mut capture_right: u64 = noea(board.white & board.pawns & !H_FILE) & !(board.black | board.white);
         
         while capture_left != 0 {
             let idx: i8 =  capture_left.trailing_zeros() as i8;
@@ -479,8 +474,8 @@ fn generate_pawn_moves(board: &Board, moves: &mut Vec<u8>) {
         }
 
         //En passant
-        let passant_left: u64 = nowe(board.white & board.pawns & !A_FILE) & board.en_passant_target;
-        let passant_right: u64 = noea(board.white & board.pawns & !H_FILE) & board.en_passant_target;
+        let passant_left: u64 = nowe(board.white & board.pawns & !A_FILE) & (1<<board.en_passant_target);
+        let passant_right: u64 = noea(board.white & board.pawns & !H_FILE) & (1<<board.en_passant_target);
 
         if passant_left != 0 {
             let idx: i8 = passant_left.trailing_zeros() as i8;
@@ -495,8 +490,8 @@ fn generate_pawn_moves(board: &Board, moves: &mut Vec<u8>) {
         }
     } else {
          //Pushes and double pushes
-        let mut single_push: u64 = sout(board.black & board.pawns) & board.empty;
-        let mut double_push: u64 = sout(single_push & SIXTH_RANK) & board.empty;
+        let mut single_push: u64 = sout(board.black & board.pawns) & !(board.black | board.white);
+        let mut double_push: u64 = sout(single_push & SIXTH_RANK) & !(board.black | board.white);
 
         while single_push != 0 {
             let idx:i8 = single_push.trailing_zeros() as i8;    
@@ -512,8 +507,8 @@ fn generate_pawn_moves(board: &Board, moves: &mut Vec<u8>) {
         }
 
         //Captures
-        let mut capture_left: u64 = sowe(board.black & board.pawns & !A_FILE) & board.white;
-        let mut capture_right: u64 = soea(board.black & board.pawns & !H_FILE) & board.white;
+        let mut capture_left: u64 = sowe(board.black & board.pawns & !A_FILE) & !(board.black | board.white);
+        let mut capture_right: u64 = soea(board.black & board.pawns & !H_FILE) & !(board.black | board.white);
         
         while capture_left != 0 {
             let idx: i8 =  capture_left.trailing_zeros() as i8;
@@ -530,8 +525,8 @@ fn generate_pawn_moves(board: &Board, moves: &mut Vec<u8>) {
         }
 
         //En passant
-        let passant_left: u64 = sowe(board.black & board.pawns & !A_FILE) & board.en_passant_target;
-        let passant_right: u64 = soea(board.black & board.pawns & !H_FILE) & board.en_passant_target;
+        let passant_left: u64 = sowe(board.black & board.pawns & !A_FILE) & (1<<board.en_passant_target);
+        let passant_right: u64 = soea(board.black & board.pawns & !H_FILE) & (1<<board.en_passant_target);
 
         if passant_left != 0 {
             let idx: i8 = passant_left.trailing_zeros() as i8;
@@ -625,11 +620,11 @@ fn generate_bishop_moves(board: &Board, moves: &mut Vec<u8>) {
     let mut defend_pieces: u64 = 0;
     
     if board.is_white_move {
-        bishops = board.white & (board.bishops | board.queens);
+        bishops = board.white & (board.bishops);
         attack_pieces = board.white;
         defend_pieces = board.black;
     } else {
-        bishops = board.black & (board.bishops | board.queens);
+        bishops = board.black & (board.bishops);
         attack_pieces = board.black;
         defend_pieces = board.white;
     }
@@ -648,7 +643,7 @@ fn generate_bishop_moves(board: &Board, moves: &mut Vec<u8>) {
         bishops = bishops & !defend_pieces;
     }
     
-    bishops = attack_pieces & (board.bishops | board.queens);
+    bishops = attack_pieces & (board.bishops);
     iter = 1;
     while bishops != 0 {
         bishops = soea(bishops & !(FIRST_RANK | H_FILE)) & !attack_pieces;
@@ -664,7 +659,7 @@ fn generate_bishop_moves(board: &Board, moves: &mut Vec<u8>) {
         bishops = bishops & !defend_pieces;
     }
     
-    bishops = attack_pieces & (board.bishops | board.queens);
+    bishops = attack_pieces & (board.bishops);
     iter = 1;
     while bishops != 0 {
         bishops = sowe(bishops & !(FIRST_RANK | A_FILE)) & !attack_pieces;
@@ -680,7 +675,7 @@ fn generate_bishop_moves(board: &Board, moves: &mut Vec<u8>) {
         bishops = bishops & !defend_pieces;
     }
 
-    bishops = attack_pieces & (board.bishops | board.queens);
+    bishops = attack_pieces & (board.bishops);
     iter = 1;
     while bishops != 0 {
         bishops = nowe(bishops & !(EIGTH_RANK | A_FILE)) & !attack_pieces;
@@ -705,11 +700,11 @@ fn generate_rook_moves(board: &Board, moves: &mut Vec<u8>) {
     let mut defend_pieces: u64 = 0;
     
     if board.is_white_move {
-        rooks = board.white & (board.rooks | board.queens);
+        rooks = board.white & (board.rooks);
         attack_pieces = board.white;
         defend_pieces = board.black;
     } else {
-        rooks = board.black & (board.rooks | board.queens);
+        rooks = board.black & (board.rooks);
         attack_pieces = board.black;
         defend_pieces = board.white;
     }
@@ -730,7 +725,7 @@ fn generate_rook_moves(board: &Board, moves: &mut Vec<u8>) {
     }
     
     //sout moves
-    rooks = attack_pieces & (board.rooks | board.queens);
+    rooks = attack_pieces & (board.rooks);
     iter = 1;
     while rooks != 0 {
         rooks = sout(rooks & !FIRST_RANK) & !attack_pieces;
@@ -747,7 +742,7 @@ fn generate_rook_moves(board: &Board, moves: &mut Vec<u8>) {
     }
     
     //east moves
-    rooks = attack_pieces & (board.rooks | board.queens);
+    rooks = attack_pieces & (board.rooks);
     iter = 1;
     while rooks != 0 {
         rooks = east(rooks & !H_FILE) & !attack_pieces;
@@ -764,7 +759,7 @@ fn generate_rook_moves(board: &Board, moves: &mut Vec<u8>) {
     }
 
     //west moves
-    rooks= attack_pieces & (board.rooks | board.queens);
+    rooks= attack_pieces & (board.rooks);
     iter = 1;
     while rooks != 0 {
         rooks = west(rooks & !A_FILE) & !attack_pieces;
@@ -785,17 +780,18 @@ fn generate_king_moves(board: &Board, moves: &mut Vec<u8>) {
     let mut king: u64 = 0;
     let mut attack_pieces: u64 = 0;
     let mut defend_pieces: u64 = 0;
+    let empty = !(board.black | board.white);
     
     if board.is_white_move {
         king = board.white & board.kings;
         attack_pieces = board.white;
         defend_pieces = board.black;
-       
-        if board.white_castle_long && (WHITE_LONG_EMPTY & board.empty) == WHITE_LONG_EMPTY {
+
+        if board.white_castle_long && (WHITE_LONG_EMPTY & empty) == WHITE_LONG_EMPTY {
             moves.push(king.trailing_zeros() as u8);
             moves.push(WHITE_LONG_DEST_IDX);
         }
-        if board.white_castle_short && (WHITE_SHORT_EMPTY & board.empty) == WHITE_SHORT_EMPTY {
+        if board.white_castle_short && (WHITE_SHORT_EMPTY & empty) == WHITE_SHORT_EMPTY {
             moves.push(king.trailing_zeros() as u8);
             moves.push(WHITE_SHORT_DEST_IDX);
         }
@@ -804,11 +800,11 @@ fn generate_king_moves(board: &Board, moves: &mut Vec<u8>) {
         attack_pieces = board.black;
         defend_pieces = board.white;
         
-        if board.black_castle_long && (BLACK_LONG_EMPTY & board.empty) == BLACK_LONG_EMPTY {
+        if board.black_castle_long && (BLACK_LONG_EMPTY & empty) == BLACK_LONG_EMPTY {
             moves.push(king.trailing_zeros() as u8);
             moves.push(BLACK_LONG_DEST_IDX);
         }
-        if board.black_castle_short && (BLACK_SHORT_EMPTY & board.empty) == BLACK_SHORT_EMPTY {
+        if board.black_castle_short && (BLACK_SHORT_EMPTY & empty) == BLACK_SHORT_EMPTY {
             moves.push(king.trailing_zeros() as u8);
             moves.push(BLACK_SHORT_DEST_IDX);
         }
@@ -857,6 +853,7 @@ fn generate_attacks(board: &Board) -> u64 {
     let mut attack: u64 = 0;
     let mut attack_pieces = 0; 
     let mut defend_pieces = 0;
+    let empty = !(board.black | board.white);
     
     if board.is_white_move {
         attack_pieces = board.white;
@@ -911,62 +908,62 @@ fn generate_attacks(board: &Board) -> u64 {
         ak |= west(west(nort(n_orig[i] & !(A_FILE | B_FILE | EIGTH_RANK))));
     }
 
-    let mut bishops: u64 = attack_pieces & (board.bishops | board.queens); 
+    let mut bishops: u64 = attack_pieces & board.bishops; 
     
     while bishops != 0 {
         bishops = noea(bishops & !(EIGTH_RANK | H_FILE));
         attack |= bishops;
-        bishops = bishops & board.empty;
+        bishops = bishops & empty;
     }
     
-    bishops = attack_pieces & (board.bishops | board.queens);
+    bishops = attack_pieces & (board.bishops);
     while bishops != 0 {
         bishops = soea(bishops & !(FIRST_RANK | H_FILE));
         attack |= bishops; 
-        bishops = bishops & board.empty;
+        bishops = bishops & empty;
     }
     
-    bishops = attack_pieces & (board.bishops | board.queens);
+    bishops = attack_pieces & (board.bishops);
     while bishops != 0 {
         bishops = sowe(bishops & !(FIRST_RANK | A_FILE));
         attack |= bishops; 
-        bishops = bishops & board.empty;
+        bishops = bishops & empty;
     }
 
-    bishops = attack_pieces & (board.bishops | board.queens);
+    bishops = attack_pieces & (board.bishops);
     while bishops != 0 {
         bishops = nowe(bishops & !(EIGTH_RANK | A_FILE));
         attack |= bishops; 
-        bishops = bishops & board.empty;
+        bishops = bishops & empty;
     }
 
-    let mut rooks: u64 = attack_pieces & (board.rooks | board.queens); 
+    let mut rooks: u64 = attack_pieces & (board.rooks); 
     
     while rooks != 0 {
         rooks = nort(rooks & !EIGTH_RANK);
         attack |= rooks; 
-        rooks = rooks & board.empty;
+        rooks = rooks & empty;
     }
     
-    rooks = attack_pieces & (board.rooks | board.queens);
+    rooks = attack_pieces & (board.rooks);
     while rooks != 0 {
         rooks = sout(rooks & !FIRST_RANK);
         attack |= rooks; 
-        rooks = rooks & board.empty;
+        rooks = rooks & empty;
     }
     
-    rooks = attack_pieces & (board.rooks | board.queens);
+    rooks = attack_pieces & (board.rooks);
     while rooks != 0 {
         rooks = east(rooks & !H_FILE);
         attack |= rooks; 
-        rooks = rooks & board.empty;
+        rooks = rooks & empty;
     }
 
-    rooks = attack_pieces & (board.rooks | board.queens);
+    rooks = attack_pieces & (board.rooks);
     while rooks != 0 {
         rooks = west(rooks & !A_FILE);
         attack |= rooks; 
-        rooks = rooks & board.empty;
+        rooks = rooks & empty;
     }
     let k: u64 = board.kings & attack_pieces; 
     attack |= nort(k & !EIGTH_RANK) | noea(k & !(EIGTH_RANK | H_FILE)) 
@@ -989,9 +986,6 @@ pub fn load_fen(board: &mut Board, fen: &str){
     board.knights = 0;
     board.bishops = 0;
     board.rooks = 0;
-    board.queens = 0;
-    board.queens = 0; 
-    board.empty = ALL_SQUARES;
     board.is_white_move = false; 
     board.white_castle_short = false;
     board.white_castle_long = false;
@@ -1025,10 +1019,9 @@ pub fn load_fen(board: &mut Board, fen: &str){
     }
 
     if !passant.starts_with("-") {
-        board.en_passant_target = 1<<map_notation(passant.to_string());
+        board.en_passant_target = map_notation(passant.to_string());
     }
     
-    board.empty = !(board.black | board.white)
 
 }
 
@@ -1048,7 +1041,8 @@ fn place_piece(board: &mut Board, square: u8, piece: char){
     } else if piece == 'r' {
         board.rooks |= 1 << square;
     } else if piece == 'q' {
-        board.queens |= 1 << square;
+        board.rooks |= 1 << square;
+        board.bishops |= 1 << square;
     } else if piece == 'k' {
         board.kings |= 1 << square; 
     }
@@ -1142,26 +1136,26 @@ fn get_square_fen(board: &Board, loc: u64) -> char{
     let mask: u64 = 1 << loc;
     if mask & board.white & board.pawns != 0 {
         return 'P';
+    } else if mask & board.white & board.rooks & board.bishops != 0 {
+        return 'Q';
     } else if mask & board.white & board.knights != 0 {
         return 'N';
     } else if mask & board.white & board.bishops != 0 {
         return 'B';
     } else if mask & board.white & board.rooks != 0 {
         return 'R';
-    } else if mask & board.white & board.queens != 0 {
-        return 'Q';
     } else if mask & board.white & board.kings != 0 {
         return 'K';
     } else if mask & board.black & board.pawns != 0 {
         return 'p';
+    } else if mask & board.black & board.rooks & board.bishops != 0 {
+        return 'q';
     } else if mask & board.black & board.knights != 0 {
         return 'n';
     } else if mask & board.black & board.bishops != 0 {
         return 'b';
     } else if mask & board.black & board.rooks != 0 {
         return 'r';
-    } else if mask & board.black & board.queens != 0 {
-        return 'q';
     } else if mask & board.black & board.kings != 0 {
         return 'k';
     } else{
@@ -1177,7 +1171,6 @@ fn capture_square(board: &mut Board, idx: u8){
     board.knights &= no_square;
     board.bishops &= no_square;
     board.rooks &= no_square;
-    board.queens &= no_square;
     board.kings &= no_square;
     board.white &= no_square;
     board.black &= no_square;
@@ -1196,7 +1189,6 @@ fn move_square(board: &mut Board, from: u8, to: u8){
     move_bit(&mut board.knights, from, to);
     move_bit(&mut board.bishops, from, to);
     move_bit(&mut board.rooks, from, to);
-    move_bit(&mut board.queens, from, to);
     move_bit(&mut board.kings, from, to);
     move_bit(&mut board.white, from, to);
     move_bit(&mut board.black, from, to);

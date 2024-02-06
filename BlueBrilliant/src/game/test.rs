@@ -5,6 +5,7 @@ use std::io;
 use std::mem;
 
 fn main(){
+    print!("{}", mem::size_of::<board::Board>());
     let args: Vec<String> = env::args().collect();
     if args.len() == 4 {
         test_mode_moves(&args[1], &args[2], &args[3]); 
