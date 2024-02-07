@@ -110,11 +110,15 @@ impl Board {
     }
 
     pub fn bishops(&self) -> u64 {
-        self.bishops
+        self.bishops & !self.rooks
     }
 
     pub fn rooks(&self) -> u64 {
-        self.rooks
+        self.rooks & !self.bishops
+    }
+    
+    pub fn queens(&self) -> u64 {
+        self.rooks & self.bishops
     }
 
     pub fn kings(&self) -> u64 {
@@ -151,59 +155,6 @@ impl Board {
 
     pub fn is_white_move(&self) -> bool {
         self.is_white_move
-    }
-
-    // Setters
-    pub fn set_pawns(&mut self, value: u64) {
-        self.pawns = value;
-    }
-
-    pub fn set_knights(&mut self, value: u64) {
-        self.knights = value;
-    }
-
-    pub fn set_bishops(&mut self, value: u64) {
-        self.bishops = value;
-    }
-
-    pub fn set_rooks(&mut self, value: u64) {
-        self.rooks = value;
-    }
-
-    pub fn set_kings(&mut self, value: u64) {
-        self.kings = value;
-    }
-
-    pub fn set_white(&mut self, value: u64) {
-        self.white = value;
-    }
-
-    pub fn set_black(&mut self, value: u64) {
-        self.black = value;
-    }
-
-    pub fn set_en_passant_target(&mut self, value: u8) {
-        self.en_passant_target = value;
-    }
-
-    pub fn set_white_castle_long(&mut self, value: bool) {
-        self.white_castle_long = value;
-    }
-
-    pub fn set_white_castle_short(&mut self, value: bool) {
-        self.white_castle_short = value;
-    }
-
-    pub fn set_black_castle_long(&mut self, value: bool) {
-        self.black_castle_long = value;
-    }
-
-    pub fn set_black_castle_short(&mut self, value: bool) {
-        self.black_castle_short = value;
-    }
-
-    pub fn set_is_white_move(&mut self, value: bool) {
-        self.is_white_move = value;
     }
 }
 
