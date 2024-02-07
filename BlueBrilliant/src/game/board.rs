@@ -84,19 +84,127 @@ const NOWE: i8 = 7;
 
 #[derive(Clone)]
 pub struct Board {
-    pub pawns: u64,
-    pub knights: u64,
-    pub bishops: u64, 
-    pub rooks: u64,
-    pub kings: u64,
-    pub white: u64,
-    pub black: u64,
-    pub en_passant_target: u8,
-    pub white_castle_long: bool,
-    pub white_castle_short: bool, 
-    pub black_castle_long: bool,
-    pub black_castle_short: bool,
-    pub is_white_move: bool
+    pawns: u64,
+    knights: u64,
+    bishops: u64,
+    rooks: u64,
+    kings: u64,
+    white: u64,
+    black: u64,
+    en_passant_target: u8,
+    white_castle_long: bool,
+    white_castle_short: bool,
+    black_castle_long: bool,
+    black_castle_short: bool,
+    is_white_move: bool,
+}
+
+impl Board {
+    // Getters
+    pub fn pawns(&self) -> u64 {
+        self.pawns
+    }
+
+    pub fn knights(&self) -> u64 {
+        self.knights
+    }
+
+    pub fn bishops(&self) -> u64 {
+        self.bishops
+    }
+
+    pub fn rooks(&self) -> u64 {
+        self.rooks
+    }
+
+    pub fn kings(&self) -> u64 {
+        self.kings
+    }
+
+    pub fn white(&self) -> u64 {
+        self.white
+    }
+
+    pub fn black(&self) -> u64 {
+        self.black
+    }
+
+    pub fn en_passant_target(&self) -> u8 {
+        self.en_passant_target
+    }
+
+    pub fn white_castle_long(&self) -> bool {
+        self.white_castle_long
+    }
+
+    pub fn white_castle_short(&self) -> bool {
+        self.white_castle_short
+    }
+
+    pub fn black_castle_long(&self) -> bool {
+        self.black_castle_long
+    }
+
+    pub fn black_castle_short(&self) -> bool {
+        self.black_castle_short
+    }
+
+    pub fn is_white_move(&self) -> bool {
+        self.is_white_move
+    }
+
+    // Setters
+    pub fn set_pawns(&mut self, value: u64) {
+        self.pawns = value;
+    }
+
+    pub fn set_knights(&mut self, value: u64) {
+        self.knights = value;
+    }
+
+    pub fn set_bishops(&mut self, value: u64) {
+        self.bishops = value;
+    }
+
+    pub fn set_rooks(&mut self, value: u64) {
+        self.rooks = value;
+    }
+
+    pub fn set_kings(&mut self, value: u64) {
+        self.kings = value;
+    }
+
+    pub fn set_white(&mut self, value: u64) {
+        self.white = value;
+    }
+
+    pub fn set_black(&mut self, value: u64) {
+        self.black = value;
+    }
+
+    pub fn set_en_passant_target(&mut self, value: u8) {
+        self.en_passant_target = value;
+    }
+
+    pub fn set_white_castle_long(&mut self, value: bool) {
+        self.white_castle_long = value;
+    }
+
+    pub fn set_white_castle_short(&mut self, value: bool) {
+        self.white_castle_short = value;
+    }
+
+    pub fn set_black_castle_long(&mut self, value: bool) {
+        self.black_castle_long = value;
+    }
+
+    pub fn set_black_castle_short(&mut self, value: bool) {
+        self.black_castle_short = value;
+    }
+
+    pub fn set_is_white_move(&mut self, value: bool) {
+        self.is_white_move = value;
+    }
 }
 
 pub fn create_board() -> Board {
