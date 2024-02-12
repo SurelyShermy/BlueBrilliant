@@ -191,11 +191,12 @@ impl Evaluation{
     if moves.len() == 0 {
         if is_check(board) {
             if maximizing_player {
+                //Should node type here be exact??
                 let new_entry = TableEntry::new(self.zobrist_keys.compute_hash(board), depth, Some(mve), i32::MIN + depth as i32, LOWERBOUND);
                 self.transposition_table.store(new_entry);
                 return (i32::MIN + depth as i32, mve, node_count);
             } else {
-                let new_entry = TableEntry::new(self.zobrist_keys.compute_hash(board), depth, Some(mve), i32::MAX + depth as i32, UPPERBOUND);
+                let new_entry = TableEntry::new(self.zobrist_keys.compute_hash(board), depth, Some(mve), i32::MAX - depth as i32, UPPERBOUND);
                 self.transposition_table.store(new_entry);
                 return (i32::MAX - depth as i32, mve, node_count);
             }
@@ -204,10 +205,12 @@ impl Evaluation{
         }
     }
     let ttval = self.transposition_table.lookup(self.zobrist_keys.compute_hash(board));
+    // //Pass by reference instead?
     let mut alpha = initial_alpha;
     let mut beta = initial_beta;
     match ttval{
       Some(x) => {
+        // println!("Found in TT");
         if x.depth() as u32 >= depth {
           if x.node_type() == EXACT {
             return (x.score(), x.best_move().unwrap(), node_count);
@@ -231,7 +234,7 @@ impl Evaluation{
             let mut new_board: Board = simulate_move(board, moves[i], moves[i + 1]);
 
   
-            let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, initial_beta, (moves[i], moves[i + 1]), depth - 1, false);
+            let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, false);
             node_count += child_node_count;
             if score > value {
                 value = score;
@@ -258,7 +261,7 @@ impl Evaluation{
         for i in (0..moves.len()).step_by(2) {
             let mut new_board = simulate_move(board, moves[i], moves[i + 1]);
   
-            let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, initial_alpha, beta, (moves[i], moves[i + 1]), depth - 1, true);
+            let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, true);
             node_count += child_node_count;
             if score < value {
                 value = score;
@@ -269,6 +272,7 @@ impl Evaluation{
                 break;
             }
         }
+        //I think this is in the wrong place...
         let node_type = if value <= initial_alpha {
           UPPERBOUND
         } else if value >= initial_beta {

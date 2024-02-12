@@ -63,62 +63,62 @@ impl Zobrist{
         let mut black_king = board.black() & board.kings();
         while white_pawns != 0 {
             let index = white_pawns.trailing_zeros() as usize;
-            hash ^= self.piece_keys[WPAWN][index];
+            hash ^= self.piece_keys[index][WPAWN];
             white_pawns &= white_pawns - 1; 
         }
         while white_knights != 0 {
             let index = white_knights.trailing_zeros() as usize;
-            hash ^= self.piece_keys[WKNIGHT][index]; 
+            hash ^= self.piece_keys[index][WKNIGHT]; 
             white_knights &= white_knights - 1;
         }
         while white_bishops != 0 {
             let index = white_bishops.trailing_zeros() as usize;
-            hash ^= self.piece_keys[WBISHOP][index]; 
+            hash ^= self.piece_keys[index][WBISHOP]; 
             white_bishops &= white_bishops - 1;
         }
         while white_rooks != 0 {
             let index = white_rooks.trailing_zeros() as usize;
-            hash ^= self.piece_keys[WROOK][index]; 
+            hash ^= self.piece_keys[index][WROOK]; 
             white_rooks &= white_rooks - 1;
         }
         while white_queens != 0 {
             let index = white_queens.trailing_zeros() as usize;
-            hash ^= self.piece_keys[WQUEEN][index]; 
+            hash ^= self.piece_keys[index][WQUEEN]; 
             white_queens &= white_queens - 1; 
         }
         while white_king != 0 {
             let index = white_king.trailing_zeros() as usize;
-            hash ^= self.piece_keys[WKING][index]; 
+            hash ^= self.piece_keys[index][WKING]; 
             white_king &= white_king - 1; 
         }
         while black_pawns != 0 {
             let index = black_pawns.trailing_zeros() as usize;
-            hash ^= self.piece_keys[BPAWN][index]; 
+            hash ^= self.piece_keys[index][BPAWN]; 
             black_pawns &= black_pawns - 1; 
         }
         while black_knights != 0 {
             let index = black_knights.trailing_zeros() as usize;
-            hash ^= self.piece_keys[BKNIGHT][index]; 
+            hash ^= self.piece_keys[index][BKNIGHT]; 
             black_knights &= black_knights - 1; 
         }
         while black_bishops != 0 {
             let index = black_bishops.trailing_zeros() as usize;
-            hash ^= self.piece_keys[BBISHOP][index];
+            hash ^= self.piece_keys[index][BBISHOP];
             black_bishops &= black_bishops - 1; 
         }
         while black_rooks != 0 {
             let index = black_rooks.trailing_zeros() as usize;
-            hash ^= self.piece_keys[BROOK][index]; 
+            hash ^= self.piece_keys[index][BROOK]; 
             black_rooks &= black_rooks - 1; 
         }
         while black_queens != 0 {
             let index = black_queens.trailing_zeros() as usize;
-            hash ^= self.piece_keys[BQUEEN][index];
+            hash ^= self.piece_keys[index][BQUEEN];
             black_queens &= black_queens - 1; 
         }
         while black_king != 0 {
             let index = black_king.trailing_zeros() as usize;
-            hash ^= self.piece_keys[BKING][index];
+            hash ^= self.piece_keys[index][BKING];
             black_king &= black_king - 1; 
         }
 

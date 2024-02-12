@@ -7,7 +7,7 @@ const INIT_PAWNS: u64 = 1<<8 | 1<<9 | 1<<10 | 1<<11 | 1<<12 | 1<<13 | 1<<14 | 1<
 const INIT_KNIGHTS: u64 = 1<<1 | 1<<6 | 1<<57 | 1<<62;
 const INIT_BISHOPS: u64 = 1<<2 | 1<<5 | 1<<58 | 1<<61 | 1<<3 | 1<<59;
 const INIT_ROOKS: u64 = 1<<0 | 1<<7 | 1<<56 | 1<<63 | 1<<3 | 1<<59;
-const INIT_QUEENS: u64 = 1<<3 | 1<<59;
+// const INIT_QUEENS: u64 = 1<<3 | 1<<59;
 const INIT_KINGS: u64 = 1<<4 | 1<<60;
 
 const INIT_WHITE: u64 = 1<<0 | 1<<1 | 1<<2 | 1<<3 | 1<<4 | 1<<5 | 1<<6 | 1<<7 | 1<<8 
@@ -16,7 +16,7 @@ const INIT_WHITE: u64 = 1<<0 | 1<<1 | 1<<2 | 1<<3 | 1<<4 | 1<<5 | 1<<6 | 1<<7 | 
 const INIT_BLACK: u64 = 1<<48 | 1<<49 | 1<<50 | 1<<51 | 1<<52 | 1<<53 | 1<<54 | 1<<55 |1<<56 | 1<<57 
                         | 1<<58 | 1<<59 | 1<<60 | 1<<61 | 1<<62 | 1<<63;
 
-const MAX_NUM_MOVES: usize = 300;
+// const MAX_NUM_MOVES: usize = 300;
 
 const FIRST_RANK: u64 = 1<<0 | 1<<1 | 1<<2 | 1<<3 | 1<<4 | 1<<5 | 1<<6 | 1<<7; 
 const SECOND_RANK: u64 = 1<<8 | 1<<9 | 1<<10 | 1<<11 | 1<<12 | 1<<13 | 1<<14 | 1<<15; 
@@ -28,15 +28,15 @@ const EIGTH_RANK: u64 = 1<<56 | 1<<57 | 1<<58 | 1<<59 | 1<<60 | 1<<61 | 1<<62 | 
 
 const A_FILE: u64 = 1<<0 | 1<<8 | 1<<16 | 1<<24 | 1<<32 | 1<<40 | 1<<48 | 1<<56;
 const B_FILE: u64 = 1<<1 | 1<<9 | 1<<17 | 1<<25 | 1<<33 | 1<<41 | 1<<49 | 1<<57;
-const C_FILE: u64 = 1<<2 | 1<<10 | 1<<18 | 1<<26 | 1<<34 | 1<<42 | 1<<50 | 1<<58;
-const D_FILE: u64 = 1<<3 | 1<<11 | 1<<19 | 1<<27 | 1<<35 | 1<<43 | 1<<51 | 1<<59;
-const E_FILE: u64 = 1<<4 | 1<<12 | 1<<20 | 1<<28 | 1<<36 | 1<<44 | 1<<52 | 1<<60;
-const F_FILE: u64 = 1<<5 | 1<<13 | 1<<21 | 1<<29 | 1<<37 | 1<<45 | 1<<53 | 1<<61;
+// const C_FILE: u64 = 1<<2 | 1<<10 | 1<<18 | 1<<26 | 1<<34 | 1<<42 | 1<<50 | 1<<58;
+// const D_FILE: u64 = 1<<3 | 1<<11 | 1<<19 | 1<<27 | 1<<35 | 1<<43 | 1<<51 | 1<<59;
+// const E_FILE: u64 = 1<<4 | 1<<12 | 1<<20 | 1<<28 | 1<<36 | 1<<44 | 1<<52 | 1<<60;
+// const F_FILE: u64 = 1<<5 | 1<<13 | 1<<21 | 1<<29 | 1<<37 | 1<<45 | 1<<53 | 1<<61;
 const G_FILE: u64 = 1<<6 | 1<<14 | 1<<22 | 1<<30 | 1<<38 | 1<<46 | 1<<54 | 1<<62; 
 const H_FILE: u64 = 1<<7 | 1<<15 | 1<<23 | 1<<31 | 1<<39 | 1<<47 | 1<<55 | 1<<63; 
 
-const WHITE_LONG_DEST: u64 = 1<<2;
-const WHITE_SHORT_DEST: u64 = 1<<6;
+// const WHITE_LONG_DEST: u64 = 1<<2;
+// const WHITE_SHORT_DEST: u64 = 1<<6;
 const WHITE_KING_START_IDX: u8 = 4;
 const WHITE_LONG_DEST_IDX: u8 = 2;
 const WHITE_SHORT_DEST_IDX: u8 = 6;
@@ -45,40 +45,40 @@ const WHITE_SHORT_EMPTY: u64 = 1<<5 | 1<<6;
 const WHITE_LONG_KING: u64 = 1<<2 | 1<<3 | 1<<4;
 const WHITE_SHORT_KING: u64 = 1<<4 | 1<<5 | 1<<6;
 
-const BLACK_LONG_DEST: u64 = 1<<58;
-const BLACK_SHORT_DEST: u64 = 1<<62;
+// const BLACK_LONG_DEST: u64 = 1<<58;
+// const BLACK_SHORT_DEST: u64 = 1<<62;
 const BLACK_KING_START_IDX: u8 = 60;
 const BLACK_LONG_DEST_IDX: u8 = 58;
 const BLACK_SHORT_DEST_IDX: u8 = 62;
 const BLACK_LONG_EMPTY: u64 = 1<<57 | 1<<58 | 1<<59;
 const BLACK_SHORT_EMPTY: u64 = 1<<61 | 1<<62;
-const BLACK_LONG_KING: u64 = 1<<58 | 1<<59 | 1<<60;
+// const BLACK_LONG_KING: u64 = 1<<58 | 1<<59 | 1<<60;
 const BLACK_SHORT_KING: u64 = 1<<60 | 1<<61 | 1<<62;
 
 const ALL_SQUARES: u64 = 0xffffffffffffffff;
-const NOT_A_FILE: u64 = !A_FILE;
-const NOT_H_FILE: u64 = !H_FILE;
+// const NOT_A_FILE: u64 = !A_FILE;
+// const NOT_H_FILE: u64 = !H_FILE;
 const SECOND_RANK_START_IDX: u8 = 8;
 const SECOND_RANK_END_IDX: u8 = 15;
-const FOURTH_RANK_START_IDX: u8 = 24;
-const FOURTH_RANK_END_IDX: u8 = 31;
-const FIFTH_RANK_START_IDX: u8 = 32;
-const FIFTH_RANK_END_IDX: u8 = 39;
+// const FOURTH_RANK_START_IDX: u8 = 24;
+// const FOURTH_RANK_END_IDX: u8 = 31;
+// const FIFTH_RANK_START_IDX: u8 = 32;
+// const FIFTH_RANK_END_IDX: u8 = 39;
 const SEVENTH_RANK_START_IDX: u8 = 48;
 const SEVENTH_RANK_END_IDX: u8 = 55;
 
-const BOARD_FILES: [u64; 8] = [A_FILE, B_FILE, C_FILE, D_FILE, E_FILE, F_FILE, G_FILE, H_FILE];
+// const BOARD_FILES: [u64; 8] = [A_FILE, B_FILE, C_FILE, D_FILE, E_FILE, F_FILE, G_FILE, H_FILE];
 const FILES: [char; 8] = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];    
 
 
 //make constants for all num
 const NORT: i8 = 8; 
 const NOEA: i8 = 9; 
-const EAST: i8 = 1; 
+// const EAST: i8 = 1; 
 const SOEA: i8 = -7; 
 const SOUT: i8 = -8; 
 const SOWE: i8 = -9; 
-const WEST: i8 = -1; 
+// const WEST: i8 = -1; 
 const NOWE: i8 = 7; 
 
 
@@ -193,8 +193,8 @@ fn number_of_descendents(board: &Board, depth: u8) -> u64{
 }
 
 pub fn print_move_trees(board: &Board, depth: u8){
-    let mut moves: Vec<u8> = generate_legal_moves(&board);
-    let mut boards: Vec<Board> = generate_legal_boards(&board);
+    let moves: Vec<u8> = generate_legal_moves(&board);
+    let boards: Vec<Board> = generate_legal_boards(&board);
     let mut total: u64 = 0;
     for i in (0..moves.len()).step_by(2) {
         let cur: u64 = number_of_descendents(&boards[i/2], depth-1);
