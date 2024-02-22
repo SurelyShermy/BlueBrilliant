@@ -17,7 +17,7 @@ fn main(){
     if args.len() == 2 {
         board::load_fen(&mut board, args[1].as_str());
     }
-    let depth = 8;
+    let depth = 7;
     while true {
         while board.is_white_move() {
             let mut start = String::new();
@@ -58,6 +58,8 @@ fn main(){
             println!("Eval: {}", eval);
             println!("Best Move: {:?}", best_move);
             println!("Nodes Counted: {}", nodes_counted);
+            println!("Exact: {}, Lower: {}, Upper: {}", evaluator.exact_match, evaluator.lower_match, evaluator.upper_match);
+            println!("Raw: {}", evaluator.raw_match);
             board::make_move(&mut board, best_move.0, best_move.1);
             board::print_board(&board);
         }

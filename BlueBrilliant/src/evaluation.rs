@@ -168,14 +168,22 @@ pub fn north_fill(pawns: u64) -> u64 {
 pub struct Evaluation {
   transposition_table: TranspositionTable,
   zobrist_keys: Zobrist,
+  pub exact_match: u64,
+  pub upper_match: u64,
+  pub lower_match: u64, 
+  pub raw_match: u64,
 }
 
 
 impl Evaluation{
   pub fn new() -> Self {
     Evaluation {
-        transposition_table: TranspositionTable::new(1000000),
+        transposition_table: TranspositionTable::new(100000000),
         zobrist_keys: Zobrist::new(),
+        exact_match: 0,
+        upper_match: 0,
+        lower_match: 0,
+        raw_match: 0,
     }
   }
 
@@ -211,12 +219,16 @@ impl Evaluation{
     match ttval{
       Some(x) => {
         // println!("Found in TT");
+        self.raw_match += 1;
         if x.depth() as u32 >= depth {
           if x.node_type() == EXACT {
+            self.exact_match += 1;
             return (x.score(), x.best_move().unwrap(), node_count);
           } else if x.node_type() == LOWERBOUND {
+            self.lower_match += 1;
             alpha = initial_alpha.max(x.score());
           } else if x.node_type() == UPPERBOUND {
+            self.upper_match += 1;
             beta = initial_beta.min(x.score());
           }
           if alpha >= beta {
