@@ -346,9 +346,19 @@ fn is_capture(board: &Board, index: u8) -> bool {
         return (1<<index) & board.white != 0;
     }
 }
+//if a pawn is on the last rank and the make move function calls this, then it must result in a promotion, forward is the only valid move
+
+fn is_promotion(board: &Board, start: u8) -> bool {
+    if board.is_white_move {
+        return (1<<start) & board.white & board.pawns & EIGTH_RANK != 0;
+    } else {
+        return (1<<start) & board.black & board.pawns & FIRST_RANK != 0;
+    }
+}
 //Takes a board and does a move on that board
 pub fn make_move(board: &mut Board, start: u8, end: u8) {
     if board.is_white_move {
+        //If this is an enp
         if  1<<start & board.white & board.pawns != 0 && board.en_passant_target == end && end != 0 {
             capture_square(board, end - 8);
             move_square(board, start, end);
@@ -432,10 +442,20 @@ pub fn print_pseudo_moves(board: &Board) {
 }
 
 pub fn generate_legal_moves(board: &Board) -> Vec<u8> {
-    let mut moves: Vec<u8> = generate_all_moves(board);
+    let moves: Vec<u8> = generate_all_moves(board);
+    let mut legal_moves: Vec<u8> = Vec::new();
+    for i in (0..moves.len()).step_by(2) { 
+        if valid_move(board, moves[i], moves[i+1]){
+            legal_moves.push(moves[i]);
+            legal_moves.push(moves[i+1]);
+        }
+    }
+    legal_moves
+}
+pub fn capture_ordering(board: &Board) -> Vec<u8> {
+    let moves: Vec<u8> = generate_all_moves(board);
     let mut legal_moves: Vec<u8> = Vec::new();
     let mut captures: Vec<u8> = Vec::new();
-    
     for i in (0..moves.len()).step_by(2) { 
         if valid_move(board, moves[i], moves[i+1]){
             if is_capture(board, moves[i+1]) {
@@ -450,11 +470,53 @@ pub fn generate_legal_moves(board: &Board) -> Vec<u8> {
     captures.append(&mut legal_moves);
     return captures;
 }
+pub fn ab_move_generation(board: &Board) -> Vec<u8> {
+    let moves: Vec<u8> = generate_all_moves(board);
+    let mut quiet_moves: Vec<u8> = Vec::new();
+    let mut checks: Vec<u8> = Vec::new();
+    let mut captures_with_check: Vec<u8> = Vec::new();
+    let mut captures_only: Vec<u8> = Vec::new();
+    let mut ab_moves: Vec<u8> = Vec::new();
+    for i in (0..moves.len()).step_by(2) { 
+        if valid_move(board, moves[i], moves[i+1]){
+            let sim_board = simulate_move(board, moves[i], moves[i+1]);
+            let capture = is_capture(board, moves[i+1]);
+            let check = is_check(&sim_board);
+            //If its a check and a capture
+            if check{
+                if capture {
+                    captures_with_check.push(moves[i]);
+                    captures_with_check.push(moves[i+1]);
+                    continue
+                //just a check
+                } else {
+                    checks.push(moves[i]);
+                    checks.push(moves[i+1]);
+                    continue
+                }
+            }
+            //just a capture
+            if capture && !check{
+                captures_only.push(moves[i]);
+                captures_only.push(moves[i+1]);
+                continue
+            //just a quiet move
+            } else {
+                quiet_moves.push(moves[i]);
+                quiet_moves.push(moves[i+1]);
+                continue
+            }
+        }
+    }
+    ab_moves.append(&mut captures_with_check);
+    ab_moves.append(&mut captures_only);
+    ab_moves.append(&mut checks);
+    ab_moves.append(&mut quiet_moves);
+    ab_moves
+}
 
-pub fn is_check(board: &mut Board) -> bool {
-    board.is_white_move = !board.is_white_move;
+pub fn is_check(board: &Board) -> bool {
     let mut attacks: u64 = generate_attacks(board);
-    board.is_white_move = !board.is_white_move;
     let king: u8 = king_position(board);
     attacks &= 1<<king;
     return attacks != 0;
@@ -930,15 +992,15 @@ fn generate_attacks(board: &Board) -> u64 {
     }
 
     if board.is_white_move{ //convert black and white into an array of len 2 and inx into that
-        let mut capture_left: u64 = nowe(board.white & board.pawns & !A_FILE & !EIGTH_RANK);
-        let mut capture_right: u64 = noea(board.white & board.pawns & !H_FILE & !EIGTH_RANK);
+        let capture_left: u64 = nowe(board.white & board.pawns & !A_FILE & !EIGTH_RANK);
+        let capture_right: u64 = noea(board.white & board.pawns & !H_FILE & !EIGTH_RANK);
         
         attack |= capture_left;
         attack |= capture_right;
     
     } else {
-        let mut capture_left: u64 = sowe(board.black & board.pawns & !A_FILE & !EIGTH_RANK);
-        let mut capture_right: u64 = soea(board.black & board.pawns & !H_FILE & !EIGTH_RANK);
+        let capture_left: u64 = sowe(board.black & board.pawns & !A_FILE & !EIGTH_RANK);
+        let capture_right: u64 = soea(board.black & board.pawns & !H_FILE & !EIGTH_RANK);
         
         attack |= capture_left;
         attack |= capture_right

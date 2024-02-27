@@ -1,10 +1,6 @@
 
 use crate::board::*;
 use crate::transposition::*;
-// use board::nort;
-// use board::sout;
-// use board::east_one;
-// use board::west_one;
 
 //Piece Square tables
 fn flip_index(index: usize) -> usize {
@@ -195,7 +191,7 @@ impl Evaluation{
       self.transposition_table.store(new_entry);
         return (evaluate_board(board) as i32, mve, node_count);
     }
-    let moves = generate_legal_moves(board);
+    let moves = capture_ordering(board);
     if moves.len() == 0 {
         if is_check(board) {
             if maximizing_player {
