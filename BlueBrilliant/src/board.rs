@@ -17,6 +17,15 @@ const INIT_BLACK: u64 = 1<<48 | 1<<49 | 1<<50 | 1<<51 | 1<<52 | 1<<53 | 1<<54 | 
                         | 1<<58 | 1<<59 | 1<<60 | 1<<61 | 1<<62 | 1<<63;
 
 // const MAX_NUM_MOVES: usize = 300;
+pub const PROMOTE_LEFT: u8 = 0;
+pub const PROMOTE_RIGHT: u8 = 1<<6;
+pub const PROMOTE_CENTER: u8 = 1<<7;
+pub const DIRECTION_MASK: u8 = 0b11000000;
+pub const PIECE_MASK: u8 = 0b00110000;
+pub const KNIGHT_MASK: u8 = 0;
+pub const BISHOP_MASK: u8 = 1<<4;
+pub const ROOK_MASK: u8 = 1<<5;
+pub const QUEEN_MASK: u8 = 1<<4 | 1<<5;
 
 const FIRST_RANK: u64 = 1<<0 | 1<<1 | 1<<2 | 1<<3 | 1<<4 | 1<<5 | 1<<6 | 1<<7; 
 const SECOND_RANK: u64 = 1<<8 | 1<<9 | 1<<10 | 1<<11 | 1<<12 | 1<<13 | 1<<14 | 1<<15; 
@@ -119,6 +128,10 @@ impl Board {
     
     pub fn queens(&self) -> u64 {
         self.rooks & self.bishops
+    }
+    pub fn add_queens(&mut self, queens: u64) {
+        self.rooks |= queens;
+        self.bishops |= queens;
     }
 
     pub fn kings(&self) -> u64 {
@@ -358,6 +371,33 @@ fn is_promotion(board: &Board, start: u8) -> bool {
 //Takes a board and does a move on that board
 pub fn make_move(board: &mut Board, start: u8, end: u8) {
     if board.is_white_move {
+        if(1<<start & board.white & board.pawns & SEVENTH_RANK != 0){
+            //promotion
+            capture_square(board, start);
+            let mut index = 0;
+            if end & DIRECTION_MASK == PROMOTE_LEFT {
+                index = start+7;
+                capture_square(board, index);
+            } else if end & DIRECTION_MASK == PROMOTE_RIGHT {
+                index = start+9;
+                capture_square(board, index);
+            } else if end & DIRECTION_MASK == PROMOTE_CENTER {
+                index = start+8;
+                capture_square(board, index);
+            } 
+            //set end
+            if end & PIECE_MASK == KNIGHT_MASK {
+                board.knights |= 1<<index;
+            } else if end & PIECE_MASK == BISHOP_MASK {
+                board.bishops |= 1<<index;
+            } else if end & PIECE_MASK == ROOK_MASK {
+                board.rooks |= 1<<index;
+            } else {
+                board.add_queens(1<<index);
+            }
+            board.white |= 1<<index;
+            return;
+        }
         //If this is an enp
         if  1<<start & board.white & board.pawns != 0 && board.en_passant_target == end && end != 0 {
             capture_square(board, end - 8);
@@ -383,6 +423,33 @@ pub fn make_move(board: &mut Board, start: u8, end: u8) {
             }
         }
     } else {
+        if(1<<start & board.black & board.pawns & SECOND_RANK != 0){
+            //promotion
+            capture_square(board, start);
+            let mut index = 0;
+            if end & DIRECTION_MASK == PROMOTE_LEFT {
+                index = start-9;
+                capture_square(board, index);
+            } else if end & DIRECTION_MASK == PROMOTE_RIGHT {
+                index = start-7;
+                capture_square(board, index);
+            } else if end & DIRECTION_MASK == PROMOTE_CENTER {
+                index = start-8;
+                capture_square(board, index);
+            } 
+            //set end
+            if end & PIECE_MASK == KNIGHT_MASK {
+                board.knights |= 1<<index;
+            } else if end & PIECE_MASK == BISHOP_MASK {
+                board.bishops |= 1<<index;
+            } else if end & PIECE_MASK == ROOK_MASK {
+                board.rooks |= 1<<index;
+            } else {
+                board.add_queens(1<<index);
+            }
+            board.black |= 1<<index;
+            return;
+        }
         if  1<<start & board.black & board.pawns != 0 && board.en_passant_target == end && end != 0 {
             capture_square(board, end + 8);
             move_square(board, start, end);
