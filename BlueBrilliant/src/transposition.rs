@@ -150,15 +150,17 @@ pub struct TableEntry{
     best_move: Option<(u8, u8)>,
     score: i32,
     node_type: u8,
+    open: bool,
 }
 impl TableEntry{
-    pub fn new(key: u64, depth: u32, best_move: Option<(u8, u8)>, score: i32, node_type: u8) -> TableEntry{
+    pub fn new(key: u64, depth: u32, best_move: Option<(u8, u8)>, score: i32, node_type: u8, open: bool) -> TableEntry{
         TableEntry{
             key,
             depth,
             best_move,
             score,
             node_type,
+            open
         }
     }
     pub fn key(&self) -> u64{
@@ -176,6 +178,20 @@ impl TableEntry{
     pub fn node_type(&self) -> u8{
         self.node_type
     }
+    pub fn open(&self) -> bool{
+        self.open
+    }
+    pub fn set_open(&mut self, open: bool){
+        self.open = open;
+    }
+    pub fn set_entry(&mut self, depth: u32, best_move: Option<(u8, u8)>, score: i32, node_type: u8, open: bool){
+        self.depth = depth;
+        self.best_move = best_move;
+        self.score = score;
+        self.node_type = node_type;
+        self.open = open;
+    }
+
 }
 pub struct TranspositionTable {
     table: HashMap<u64, TableEntry>,
@@ -189,7 +205,6 @@ impl TranspositionTable {
             size,
         }
     }
-
     pub fn store(&mut self, entry: TableEntry) {
         if self.table.len() >= self.size {
             let key_to_remove = *self.table.keys().next().unwrap();
@@ -197,8 +212,10 @@ impl TranspositionTable {
         }
         self.table.insert(entry.key, entry);
     }
-
-    pub fn lookup(&self, hash: u64) -> Option<&TableEntry> {
-        self.table.get(&hash)
+    pub fn lookup(&mut self, hash: u64) -> Option<&mut TableEntry> {
+        self.table.get_mut(&hash)
+    }
+    pub fn replace(&mut self, hash: u64, depth: u32, best_move: Option<(u8, u8)>, score: i32, node_type: u8, open: bool){
+        self.table.get_mut(&hash).unwrap().set_entry(depth, best_move, score, node_type, open);
     }
 }

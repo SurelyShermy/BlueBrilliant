@@ -185,36 +185,18 @@ impl Evaluation{
 
   pub fn ab_pruning(&mut self, board: &mut Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), depth: u32, maximizing_player: bool) -> (i32, (u8, u8), u32) {
     let mut node_count = 1;
-    if depth == 0 {
-      let eval = evaluate_board(board) as i32;
-      let new_entry = TableEntry::new(self.zobrist_keys.compute_hash(board), depth, Some(mve), eval, EXACT);
-      self.transposition_table.store(new_entry);
-        return (evaluate_board(board) as i32, mve, node_count);
-    }
-    let moves = capture_ordering(board);
-    if moves.len() == 0 {
-        if is_check(board) {
-            if maximizing_player {
-                //Should node type here be exact??
-                let new_entry = TableEntry::new(self.zobrist_keys.compute_hash(board), depth, Some(mve), i32::MIN + depth as i32, LOWERBOUND);
-                self.transposition_table.store(new_entry);
-                return (i32::MIN + depth as i32, mve, node_count);
-            } else {
-                let new_entry = TableEntry::new(self.zobrist_keys.compute_hash(board), depth, Some(mve), i32::MAX - depth as i32, UPPERBOUND);
-                self.transposition_table.store(new_entry);
-                return (i32::MAX - depth as i32, mve, node_count);
-            }
-        } else {
-            return (0, mve, node_count);
-        }
-    }
-    let ttval = self.transposition_table.lookup(self.zobrist_keys.compute_hash(board));
+    let hash = self.zobrist_keys.compute_hash(board);
+    let ttval = self.transposition_table.lookup(hash);
     // //Pass by reference instead?
     let mut alpha = initial_alpha;
     let mut beta = initial_beta;
     match ttval{
       Some(x) => {
         // println!("Found in TT");
+        if x.open(){
+          return (0, mve, node_count);
+        }
+        x.set_open(true);
         self.raw_match += 1;
         if x.depth() as u32 >= depth {
           if x.node_type() == EXACT {
@@ -228,12 +210,39 @@ impl Evaluation{
             beta = initial_beta.min(x.score());
           }
           if alpha >= beta {
+            x.set_open(false);
             return (x.score(), x.best_move().unwrap(), node_count);
           }
         }
       }
-      None => {}
+      None => {
+        //setting to true since this position has not been reached 
+        let new_entry: TableEntry = TableEntry::new(hash, depth, Some(mve), 0, EXACT, true);
+        self.transposition_table.store(new_entry);
+      }
     }
+    if depth == 0 {
+      self.transposition_table.replace(hash, depth, Some(mve), evaluate_board(board), EXACT, false);
+      return (evaluate_board(board) as i32, mve, node_count);
+    }
+    let moves = capture_ordering(board);
+    if moves.len() == 0 {
+        if is_check(board) {
+            if maximizing_player {
+                //Should node type here be exact??
+                self.transposition_table.replace(hash, depth, Some(mve), i32::MIN + depth as i32, LOWERBOUND, false);
+                // let new_entry = TableEntry::new(self.zobrist_keys.compute_hash(board), depth, Some(mve), i32::MIN + depth as i32, LOWERBOUND, false);
+                return (i32::MIN + depth as i32, mve, node_count);
+            } else {
+                self.transposition_table.replace(hash, depth, Some(mve), i32::MAX - depth as i32, UPPERBOUND, false);
+                // let new_entry = TableEntry::new(self.zobrist_keys.compute_hash(board), depth, Some(mve), i32::MAX - depth as i32, UPPERBOUND, false);
+                return (i32::MAX - depth as i32, mve, node_count);
+            }
+        } else {
+            return (0, mve, node_count);
+        }
+    }
+    
     let mut best_move = mve;
     if maximizing_player {
         let mut value = i32::MIN;
@@ -260,8 +269,8 @@ impl Evaluation{
         } else {
             EXACT
         };
-        let new_entry = TableEntry::new(self.zobrist_keys.compute_hash(board), depth, Some(best_move), value, node_type);
-        self.transposition_table.store(new_entry);
+        self.transposition_table.replace(hash, depth, Some(best_move), value, node_type, false);
+        // let new_entry = TableEntry::new(self.zobrist_keys.compute_hash(board), depth, Some(best_move), value, node_type, false);        
         (value, best_move, node_count)
     } else {
         let mut value = i32::MAX;
@@ -288,8 +297,7 @@ impl Evaluation{
         } else {
           EXACT
         };
-        let new_entry = TableEntry::new(self.zobrist_keys.compute_hash(board), depth, Some(best_move), value, node_type);
-        self.transposition_table.store(new_entry);
+        self.transposition_table.replace(hash, depth, Some(best_move), value, node_type, false);
         (value, best_move, node_count)
     }
   } 
