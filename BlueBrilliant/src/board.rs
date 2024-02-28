@@ -361,11 +361,11 @@ fn is_capture(board: &Board, index: u8) -> bool {
 }
 //if a pawn is on the last rank and the make move function calls this, then it must result in a promotion, forward is the only valid move
 
-fn is_promotion(board: &Board, start: u8) -> bool {
+pub fn is_promotion(board: &Board, start: u8) -> bool {
     if board.is_white_move {
-        return (1<<start) & board.white & board.pawns & EIGTH_RANK != 0;
+        return (1<<start) & board.white & board.pawns & SEVENTH_RANK != 0;
     } else {
-        return (1<<start) & board.black & board.pawns & FIRST_RANK != 0;
+        return (1<<start) & board.black & board.pawns & SECOND_RANK != 0;
     }
 }
 //Takes a board and does a move on that board

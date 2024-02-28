@@ -182,11 +182,11 @@ impl Evaluation{
         raw_match: 0,
     }
   }
-
   pub fn ab_pruning(&mut self, board: &mut Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), depth: u32, maximizing_player: bool) -> (i32, (u8, u8), u32) {
     let mut node_count = 1;
     let hash = self.zobrist_keys.compute_hash(board);
     let ttval = self.transposition_table.lookup(hash);
+
     // //Pass by reference instead?
     let mut alpha = initial_alpha;
     let mut beta = initial_beta;
@@ -248,18 +248,55 @@ impl Evaluation{
         let mut value = i32::MIN;
   
         for i in (0..moves.len()).step_by(2) {
-            let mut new_board: Board = simulate_move(board, moves[i], moves[i + 1]);
-
-  
-            let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, false);
-            node_count += child_node_count;
-            if score > value {
-                value = score;
-                best_move = (moves[i], moves[i + 1]);
+            if is_promotion(board, moves[i]){
+              if board.is_white_move(){
+                let direction = (moves[i+1]-moves[i]-7)<<6;
+                for j in 0..4{
+                  let end = direction | j<<4;
+                  let mut new_board: Board = simulate_move(board, moves[i], end);
+                  let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, false);
+                  node_count += child_node_count;
+                  if score > value {
+                      value = score;
+                      best_move = (moves[i], end);
+                  }
+                  alpha = alpha.max(value);
+                  if value >= initial_beta {
+                      break;
+                  }
+                }
+              }
+              else{
+                let direction = (moves[i+1]-moves[i]+9)<<6;
+                for j in 0..4{
+                  let end = direction | j<<4;
+                  let mut new_board: Board = simulate_move(board, moves[i], end);
+                  let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, false);
+                  node_count += child_node_count;
+                  if score > value {
+                      value = score;
+                      best_move = (moves[i], end);
+                  }
+                  alpha = alpha.max(value);
+                  if value >= initial_beta {
+                      break;
+                  }
+                }
+              }
             }
-            alpha = alpha.max(value);
-            if value >= initial_beta {
-                break;
+            else{
+
+              let mut new_board: Board = simulate_move(board, moves[i], moves[i + 1]);
+              let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, false);
+              node_count += child_node_count;
+              if score > value {
+                  value = score;
+                  best_move = (moves[i], moves[i + 1]);
+              }
+              alpha = alpha.max(value);
+              if value >= initial_beta {
+                  break;
+              }
             }
         }
         let node_type = if value <= initial_alpha {
@@ -273,9 +310,46 @@ impl Evaluation{
         // let new_entry = TableEntry::new(self.zobrist_keys.compute_hash(board), depth, Some(best_move), value, node_type, false);        
         (value, best_move, node_count)
     } else {
+
         let mut value = i32::MAX;
   
         for i in (0..moves.len()).step_by(2) {
+          if is_promotion(board, moves[i]){
+            if board.is_white_move(){
+              let direction = (moves[i+1]-moves[i]-7)<<6;
+              for j in 0..4{
+                let end = direction | j<<4;
+                let mut new_board: Board = simulate_move(board, moves[i], end);
+                let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, true);
+                node_count += child_node_count;
+                if score < value {
+                  value = score;
+                  best_move = (moves[i], moves[i + 1]);
+                }
+                beta = beta.min(value);
+                if value <= initial_alpha {
+                    break;
+                }
+              }
+            }
+            else{
+              let direction = (moves[i+1]-moves[i]+9)<<6;
+              for j in 0..4{
+                let end = direction | j<<4;
+                let mut new_board: Board = simulate_move(board, moves[i], end);
+                let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, true);
+                node_count += child_node_count;
+                if score < value {
+                  value = score;
+                  best_move = (moves[i], moves[i + 1]);
+                }
+                beta = beta.min(value);
+                if value <= initial_alpha {
+                    break;
+                }
+              }
+            }
+          }else{
             let mut new_board = simulate_move(board, moves[i], moves[i + 1]);
   
             let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, true);
@@ -288,6 +362,7 @@ impl Evaluation{
             if value <= initial_alpha {
                 break;
             }
+          }
         }
         //I think this is in the wrong place...
         let node_type = if value <= initial_alpha {
