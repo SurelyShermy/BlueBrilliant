@@ -333,7 +333,7 @@ impl Evaluation{
               }
             }
             else{
-              let direction = (moves[i+1]-moves[i]+9)<<6;
+              let direction = ((moves[i+1]+9)-moves[i])<<6;
               for j in 0..4{
                 let end = direction | j<<4;
                 let mut new_board: Board = simulate_move(board, moves[i], end);

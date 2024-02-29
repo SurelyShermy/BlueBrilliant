@@ -17,11 +17,13 @@ fn main(){
     if args.len() == 2 {
         board::load_fen(&mut board, args[1].as_str());
     }
-    let depth = 9;
+    let depth = 8;
+    env::set_var("RUST_BACKTRACE", "1");
     while true {
         while board.is_white_move() {
             let mut start = String::new();
             let mut end = String::new();
+            board::load_fen(&mut board, "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1");
             println!("Enter Move: from index, to index");
             io::stdin().read_line(&mut start).unwrap();
             io::stdin().read_line(&mut end).unwrap();
