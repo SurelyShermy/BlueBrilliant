@@ -10,20 +10,19 @@ use std::env;
 use std::io;
 use std::mem;
 
-fn main(){
+fn basic(){
     let args: Vec<String> = env::args().collect();
     let mut board = board::create_board();
     let mut evaluator = Evaluation::new();
     if args.len() == 2 {
         board::load_fen(&mut board, args[1].as_str());
     }
-    let depth = 8;
+    let depth = 15;
     env::set_var("RUST_BACKTRACE", "1");
     while true {
         while board.is_white_move() {
             let mut start = String::new();
             let mut end = String::new();
-            board::load_fen(&mut board, "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1");
             println!("Enter Move: from index, to index");
             io::stdin().read_line(&mut start).unwrap();
             io::stdin().read_line(&mut end).unwrap();
@@ -56,7 +55,7 @@ fn main(){
             let mut best_move = (0,0);
             let mut eval = 0;
             let mut nodes_counted = 0;
-            (eval, best_move, nodes_counted) = evaluation::Evaluation::ab_pruning(&mut evaluator, &mut board, i32::MIN, i32::MAX, (0,0), depth, false);
+            (eval, best_move, nodes_counted) = evaluation::Evaluation::iterative_deepening_ab_pruning(&mut evaluator, &mut board, i32::MIN, i32::MAX, (0,0), depth, false);
             println!("Eval: {}", eval);
             println!("Best Move: {:?}", best_move);
             println!("Nodes Counted: {}", nodes_counted);
@@ -107,9 +106,9 @@ fn test_mode_moves(depth: &String, fen: &String, moves: &String) {
 }
 
 
-fn user_mode() { 
+fn main() { 
     let mut board = board::create_board();
-//    board::load_fen(&mut board, "nbqkbnr/1pp1pppp/8/p2pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq - 0 1");
+    board::load_fen(&mut board, "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1");
 //    board::load_fen(&mut board, "rnbqkb1r/1ppppppp/5P2/p7/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
 //    board::load_fen(&mut board, "rnbqkbnr/1pp1pppp/3P4/p7/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
 //    board::load_fen(&mut board, "rnbqkbnr/2pppppp/p7/Pp6/8/8/1PPPPPPP/RNBQKBNR w KQkq b6 0 1");
