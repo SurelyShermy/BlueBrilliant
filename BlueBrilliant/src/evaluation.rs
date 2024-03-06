@@ -1,6 +1,8 @@
 
 use crate::board::*;
 use crate::transposition::*;
+use std::time::{Duration, Instant};
+
 
 //Piece Square tables
 fn flip_index(index: usize) -> usize {
@@ -182,8 +184,87 @@ impl Evaluation{
         raw_match: 0,
     }
   }
-  pub fn ab_pruning(&mut self, board: &mut Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), depth: u32, maximizing_player: bool) -> (i32, (u8, u8), u32) {
+  pub fn iterative_deepening_ab_pruning(&mut self, board: &mut Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), max_depth: u32, maximizing_player: bool) -> (i32, (u8, u8), u32) {
+    let mut best_move = mve;
+    let mut best_score = if maximizing_player { i32::MIN } else { i32::MAX };
+    let mut total_node_count = 0;
+    let start = Instant::now();
+    for depth in 1..=max_depth {
+        if(start.elapsed().as_secs() > 30){
+          print!("Final depth was {}\n", depth);
+          return (best_score, best_move, total_node_count);
+        }
+        let (score, move_at_depth, node_count) = self.ab_pruning(board, initial_alpha, initial_beta, best_move, depth, maximizing_player, start);
+        total_node_count += node_count;
+
+        if (maximizing_player && score > best_score) || (!maximizing_player && score < best_score) {
+            best_move = move_at_depth;
+            best_score = score;
+        }
+    }
+    (best_score, best_move, total_node_count)
+  }
+  fn quiescence_search(&mut self, board: &mut Board, alpha: i32, beta: i32, node_count: &mut u32) -> i32 {
+    *node_count += 1;
+    let mut alpha = alpha;
+    let stand_pat = evaluate_board(board);
+    if stand_pat >= beta {
+        return beta;
+    }
+    if alpha < stand_pat {
+        alpha = stand_pat;
+    }
+
+    let capture_moves = capture_moves_only(board);
+
+    for i in (0..capture_moves.len()).step_by(2) {
+        if is_promotion(board, capture_moves[i]){
+          if board.is_white_move(){
+            let direction = (capture_moves[i+1]-capture_moves[i]-7)<<6;
+            for j in 0..4{
+              let end = direction | j<<4;
+              let mut new_board: Board = simulate_move(board, capture_moves[i], end);
+              let score = self.quiescence_search(&mut new_board, alpha, beta, node_count);
+              if score >= beta {
+                return beta;
+              }
+              if score > alpha {
+                  alpha = score;
+              }
+            }
+          }
+          else{
+            let direction = ((capture_moves[i+1]+9)-capture_moves[i])<<6;
+            for j in 0..4{
+              let end = direction | j<<4;
+              let mut new_board: Board = simulate_move(board, capture_moves[i], end);
+              let score = self.quiescence_search(&mut new_board, alpha, beta, node_count);
+              if score >= beta {
+                return beta;
+              }
+              if score > alpha {
+                  alpha = score;
+              }
+            }
+          }
+        }
+        else{
+          let mut new_board: Board = simulate_move(board, capture_moves[i], capture_moves[i + 1]);
+          let score = self.quiescence_search(&mut new_board, alpha, beta, node_count);
+          if score >= beta {
+            return beta;
+          }
+          if score > alpha {
+              alpha = score;
+          }
+        }
+    }
+
+    alpha
+}
+  pub fn ab_pruning(&mut self, board: &mut Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), depth: u32, maximizing_player: bool, time: Instant) -> (i32, (u8, u8), u32) {
     let mut node_count = 1;
+    
     let hash = self.zobrist_keys.compute_hash(board);
     let ttval = self.transposition_table.lookup(hash);
 
@@ -191,16 +272,19 @@ impl Evaluation{
     let mut alpha = initial_alpha;
     let mut beta = initial_beta;
     match ttval{
-      Some(x) => {
+      Some(x) => 'block: {
         // println!("Found in TT");
         if x.open(){
           return (0, mve, node_count);
         }
         x.set_open(true);
         self.raw_match += 1;
-        if x.depth() as u32 >= depth {
+        if x.depth() as u32 >= depth && x.depth() as u32 >= 2 {
           if x.node_type() == EXACT {
             self.exact_match += 1;
+            if(x.best_move().unwrap() == (0,0)){
+              break 'block;
+            }
             return (x.score(), x.best_move().unwrap(), node_count);
           } else if x.node_type() == LOWERBOUND {
             self.lower_match += 1;
@@ -221,9 +305,14 @@ impl Evaluation{
         self.transposition_table.store(new_entry);
       }
     }
+    if(time.elapsed().as_secs() > 30){
+      return (evaluate_board(board), mve, node_count);
+    }
     if depth == 0 {
-      self.transposition_table.replace(hash, depth, Some(mve), evaluate_board(board), EXACT, false);
-      return (evaluate_board(board) as i32, mve, node_count);
+      // let eval = self.quiescence_search(board, alpha, beta, &mut node_count);
+      let eval = evaluate_board(board);
+      self.transposition_table.replace(hash, depth, Some(mve), eval, EXACT, false);
+      return (eval, mve, node_count);
     }
     let moves = capture_ordering(board);
     if moves.len() == 0 {
@@ -254,7 +343,7 @@ impl Evaluation{
                 for j in 0..4{
                   let end = direction | j<<4;
                   let mut new_board: Board = simulate_move(board, moves[i], end);
-                  let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, false);
+                  let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, false, time);
                   node_count += child_node_count;
                   if score > value {
                       value = score;
@@ -271,7 +360,7 @@ impl Evaluation{
                 for j in 0..4{
                   let end = direction | j<<4;
                   let mut new_board: Board = simulate_move(board, moves[i], end);
-                  let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, false);
+                  let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, false, time);
                   node_count += child_node_count;
                   if score > value {
                       value = score;
@@ -287,7 +376,7 @@ impl Evaluation{
             else{
 
               let mut new_board: Board = simulate_move(board, moves[i], moves[i + 1]);
-              let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, false);
+              let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, false, time);
               node_count += child_node_count;
               if score > value {
                   value = score;
@@ -320,7 +409,7 @@ impl Evaluation{
               for j in 0..4{
                 let end = direction | j<<4;
                 let mut new_board: Board = simulate_move(board, moves[i], end);
-                let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, true);
+                let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, true, time);
                 node_count += child_node_count;
                 if score < value {
                   value = score;
@@ -337,7 +426,7 @@ impl Evaluation{
               for j in 0..4{
                 let end = direction | j<<4;
                 let mut new_board: Board = simulate_move(board, moves[i], end);
-                let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, true);
+                let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, true, time);
                 node_count += child_node_count;
                 if score < value {
                   value = score;
@@ -352,7 +441,7 @@ impl Evaluation{
           }else{
             let mut new_board = simulate_move(board, moves[i], moves[i + 1]);
   
-            let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, true);
+            let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, true, time);
             node_count += child_node_count;
             if score < value {
                 value = score;
@@ -364,7 +453,6 @@ impl Evaluation{
             }
           }
         }
-        //I think this is in the wrong place...
         let node_type = if value <= initial_alpha {
           UPPERBOUND
         } else if value >= initial_beta {
