@@ -10,7 +10,7 @@ use std::env;
 use std::io;
 use std::mem;
 
-fn basic(){
+fn main(){
     let args: Vec<String> = env::args().collect();
     let mut board = board::create_board();
     let mut evaluator = Evaluation::new();
@@ -106,9 +106,9 @@ fn test_mode_moves(depth: &String, fen: &String, moves: &String) {
 }
 
 
-fn main() { 
+fn test() { 
     let mut board = board::create_board();
-    board::load_fen(&mut board, "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1");
+    // board::load_fen(&mut board, "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1");
 //    board::load_fen(&mut board, "rnbqkb1r/1ppppppp/5P2/p7/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
 //    board::load_fen(&mut board, "rnbqkbnr/1pp1pppp/3P4/p7/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
 //    board::load_fen(&mut board, "rnbqkbnr/2pppppp/p7/Pp6/8/8/1PPPPPPP/RNBQKBNR w KQkq b6 0 1");

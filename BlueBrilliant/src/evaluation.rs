@@ -264,9 +264,7 @@ impl Evaluation{
 }
   pub fn ab_pruning(&mut self, board: &mut Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), depth: u32, maximizing_player: bool, time: Instant) -> (i32, (u8, u8), u32) {
     let mut node_count = 1;
-    if(time.elapsed().as_secs() > 30){
-      return (evaluate_board(board), mve, node_count);
-    }
+    
     let hash = self.zobrist_keys.compute_hash(board);
     let ttval = self.transposition_table.lookup(hash);
 
@@ -303,6 +301,9 @@ impl Evaluation{
         let new_entry: TableEntry = TableEntry::new(hash, depth, Some(mve), 0, EXACT, true);
         self.transposition_table.store(new_entry);
       }
+    }
+    if(time.elapsed().as_secs() > 30){
+      return (evaluate_board(board), mve, node_count);
     }
     if depth == 0 {
       // let eval = self.quiescence_search(board, alpha, beta, &mut node_count);
