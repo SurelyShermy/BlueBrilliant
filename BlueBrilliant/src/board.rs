@@ -307,6 +307,9 @@ pub fn valid_move(old_board: &Board, start: u8, end: u8) -> bool {
     }else if start >= 64 || end >= 64{
         return false;
     }
+    if(start == end){
+        return false;
+    }
     let board: Board = simulate_move(old_board, start, end); 
     let attacks: u64 = generate_attacks(&board); 
     let mut moved_pieces: u64 = 0;

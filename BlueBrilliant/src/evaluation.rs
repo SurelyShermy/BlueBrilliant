@@ -272,16 +272,19 @@ impl Evaluation{
     let mut alpha = initial_alpha;
     let mut beta = initial_beta;
     match ttval{
-      Some(x) => {
+      Some(x) => 'block: {
         // println!("Found in TT");
         if x.open(){
           return (0, mve, node_count);
         }
         x.set_open(true);
         self.raw_match += 1;
-        if x.depth() as u32 >= depth {
+        if x.depth() as u32 >= depth && x.depth() as u32 >= 2 {
           if x.node_type() == EXACT {
             self.exact_match += 1;
+            if(x.best_move().unwrap() == (0,0)){
+              break 'block;
+            }
             return (x.score(), x.best_move().unwrap(), node_count);
           } else if x.node_type() == LOWERBOUND {
             self.lower_match += 1;

@@ -10,6 +10,8 @@ use std::env;
 use std::io;
 use std::mem;
 
+use crate::board::generate_legal_moves;
+
 fn main(){
     let args: Vec<String> = env::args().collect();
     let mut board = board::create_board();
@@ -46,7 +48,22 @@ fn main(){
             assert!(from_index < 64, "From index out of bounds, got {}", from_index);
             assert!(to_index >= 0, "To index out of bounds, got {}", to_index);
             assert!(to_index < 64, "To index out of bounds, got {}", to_index);
-            assert!(board::valid_move(&board, from_index, to_index), "Invalid move");
+            let moves = generate_legal_moves(&board);
+            let mut valid = false;
+            for i in (0..moves.len()).step_by(2){
+                if moves[i] == from_index && moves[i+1] == to_index {
+                    valid = true;
+                    break;
+                }
+                if i == moves.len() - 2 {
+                    println!("Invalid Move, please enter a valid move");
+                    continue;
+                }
+            }
+            if !valid {
+                println!("Invalid Move, please enter a valid move");
+                continue;
+            }
             println!("Valid Move, making move ({} -> {})", from_index, to_index);
             board::make_move(&mut board, from_index, to_index);
             board::print_board(&board);
@@ -108,7 +125,10 @@ fn test_mode_moves(depth: &String, fen: &String, moves: &String) {
 
 fn test() { 
     let mut board = board::create_board();
-    // board::load_fen(&mut board, "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1");
+    //ep test
+    // board::load_fen(&mut board, "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1");
+    //perft 4
+    // board::load_fen(&mut board, "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1");
 //    board::load_fen(&mut board, "rnbqkb1r/1ppppppp/5P2/p7/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
 //    board::load_fen(&mut board, "rnbqkbnr/1pp1pppp/3P4/p7/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
 //    board::load_fen(&mut board, "rnbqkbnr/2pppppp/p7/Pp6/8/8/1PPPPPPP/RNBQKBNR w KQkq b6 0 1");
