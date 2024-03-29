@@ -54,6 +54,17 @@ const WHITE_SHORT_EMPTY: u64 = 1<<5 | 1<<6;
 const WHITE_LONG_KING: u64 = 1<<2 | 1<<3 | 1<<4;
 const WHITE_SHORT_KING: u64 = 1<<4 | 1<<5 | 1<<6;
 
+const NONE_ENC: u8 = 0;
+const KING_ENC: u8 = 1;
+const PAWN_ENC: u8 = 2;
+const KNIGHT_ENC: u8 = 3;
+const BISHOP_ENC: u8 = 4;
+const ROOK_ENC: u8 = 5;
+const QUEEN_ENC: u8 = 6;
+
+const WHITE_ENC: u8 = 8;
+const BLACK_ENC: u8 = 16;
+
 // const BLACK_LONG_DEST: u64 = 1<<58;
 // const BLACK_SHORT_DEST: u64 = 1<<62;
 const BLACK_KING_START_IDX: u8 = 60;
@@ -299,6 +310,27 @@ fn valid_board(old_board: &Board, start: u8, end: u8) -> Option<Board> {
         return None;
     }    
     return Some(board);
+}
+
+pub fn user_move(board: &mut Board, start: u8, end: u8) {
+    let moves = generate_legal_moves(board);
+    for chunk in moves.chunks(2){
+        if chunk[0] == start && chunk[1] == end{
+            make_move(board, start, end);
+            return;
+        }
+    }
+}
+
+pub fn get_end_index(board: &mut Board, start: u8)-> Vec<u8>{
+    let moves = generate_legal_moves(board);
+    let mut ret: Vec<u8> = Vec::new();
+    for chunk in moves.chunks(2){
+        if chunk[0] == start{
+            ret.push(chunk[1]);
+        }
+    }
+    return ret;
 }
 
 pub fn valid_move(old_board: &Board, start: u8, end: u8) -> bool {
@@ -1353,7 +1385,44 @@ pub fn nowe_one(board: u64) -> u64 {
 /*
 *   Visualization and representation functions
 */
+fn board_enc(board: &Board) -> Vec<u8> {
+    let mut return_board: Vec<u8> = Vec::new();
+    for i in 0..64 {
+        return_board.push(tile_encoding(board, i));
+    }
+    return return_board;
+}
 
+fn tile_encoding(board: &Board, loc: u64) -> u8{
+    let mask: u64 = 1 << loc;
+    if mask & board.white & board.pawns != 0 {
+        return WHITE_ENC+PAWN_ENC;
+    } else if mask & board.white & board.rooks & board.bishops != 0 {
+        return WHITE_ENC+QUEEN_ENC;
+    } else if mask & board.white & board.knights != 0 {
+        return WHITE_ENC+KNIGHT_ENC;
+    } else if mask & board.white & board.bishops != 0 {
+        return WHITE_ENC+BISHOP_ENC;
+    } else if mask & board.white & board.rooks != 0 {
+        return WHITE_ENC+ROOK_ENC;
+    } else if mask & board.white & board.kings != 0 {
+        return WHITE_ENC+KING_ENC;
+    } else if mask & board.black & board.pawns != 0 {
+        return BLACK_ENC+PAWN_ENC;
+    } else if mask & board.black & board.rooks & board.bishops != 0 {
+        return BLACK_ENC+QUEEN_ENC;
+    } else if mask & board.black & board.knights != 0 {
+        return BLACK_ENC+KNIGHT_ENC;
+    } else if mask & board.black & board.bishops != 0 {
+        return BLACK_ENC+BISHOP_ENC;
+    } else if mask & board.black & board.rooks != 0 {
+        return BLACK_ENC+ROOK_ENC;
+    } else if mask & board.black & board.kings != 0 {
+        return BLACK_ENC+KING_ENC;
+    } else{
+        return NONE_ENC;
+    }
+}
 fn get_square_fen(board: &Board, loc: u64) -> char{
     let mask: u64 = 1 << loc;
     if mask & board.white & board.pawns != 0 {
