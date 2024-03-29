@@ -129,7 +129,8 @@ fn test() {
     // board::load_fen(&mut board, "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1");
     //perft 4
     // board::load_fen(&mut board, "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1");
-//    board::load_fen(&mut board, "rnbqkb1r/1ppppppp/5P2/p7/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
+    //perft 2
+    board::load_fen(&mut board, "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1");
 //    board::load_fen(&mut board, "rnbqkbnr/1pp1pppp/3P4/p7/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
 //    board::load_fen(&mut board, "rnbqkbnr/2pppppp/p7/Pp6/8/8/1PPPPPPP/RNBQKBNR w KQkq b6 0 1");
 //    board::load_fen(&mut board, "rnbqkbnr/ppp2ppp/3p4/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 1");
