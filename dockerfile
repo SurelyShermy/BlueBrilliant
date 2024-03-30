@@ -1,30 +1,35 @@
 # First stage: build the application
 FROM rust:latest as builder
 
-# Create a new empty shell project
-RUN USER=root cargo new --bin app
-WORKDIR /app
+# Create the working directory
+WORKDIR /usr/src/blue_brilliant
 
-# Copy your manifests
-COPY ./Bluebrilliant/Cargo.toml ./Cargo.toml
-COPY ./Bluebrilliant/Cargo.lock ./Cargo.lock
+# Copy your Rust project's manifests
+COPY ./BlueBrilliant/Cargo.toml ./Cargo.toml
+COPY ./BlueBrilliant/Cargo.lock ./Cargo.lock
+COPY ./BlueBrilliant/Rocket.toml ./Rocket.toml
 
-# This build step will cache your dependencies
+# Cache the dependencies by creating a dummy project
+RUN mkdir src && \
+    echo "fn main() {}" > src/main.rs
 RUN cargo build --release
 RUN rm src/*.rs
 
-# Copy your source tree
-COPY ./Bluebrilliant/src ./src
-
-# Build for release
-RUN rm ./target/release/deps/server*
+# Now copy in the actual source code of your application
+COPY ./BlueBrilliant/src ./src
+RUN ls
+# Build the project for release - this builds your actual application
 RUN cargo build --release
 
 # Second stage: prepare the runtime environment
-FROM debian:buster-slim
+# Use rust:latest as the base image for the runtime environment to match the build environment
+FROM rust:latest as runtime
 
-# Copy the binary from the builder stage
-COPY --from=builder /app/target/release/server /usr/local/bin/server
+WORKDIR /usr/src/blue_brilliant
+
+
+# Copy the compiled binary from the builder stage
+COPY --from=builder /usr/src/blue_brilliant/target/release/BlueBrilliant /usr/src/blue_brilliant
 
 # Set the binary as the container's entry point
-CMD ["server"]
+CMD ["./BlueBrilliant"]
