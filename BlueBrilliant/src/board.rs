@@ -322,7 +322,7 @@ pub fn user_move(board: &mut Board, start: u8, end: u8) {
     }
 }
 
-pub fn get_end_index(board: &mut Board, start: u8)-> Vec<u8>{
+pub fn get_end_index(board: &Board, start: u8)-> Vec<u8>{
     let moves = generate_legal_moves(board);
     let mut ret: Vec<u8> = Vec::new();
     for chunk in moves.chunks(2){
