@@ -1385,7 +1385,7 @@ pub fn nowe_one(board: u64) -> u64 {
 /*
 *   Visualization and representation functions
 */
-fn board_enc(board: &Board) -> Vec<u8> {
+pub fn board_enc(board: &Board) -> Vec<u8> {
     let mut return_board: Vec<u8> = Vec::new();
     for i in 0..64 {
         return_board.push(tile_encoding(board, i));
