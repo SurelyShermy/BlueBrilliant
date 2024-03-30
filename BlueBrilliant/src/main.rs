@@ -6,6 +6,8 @@ use std::collections::HashMap;
 use std::vec;
 use lazy_static::lazy_static;
 use std::sync::Mutex;
+use rocket::http::Method; // Import Method from rocket::http
+use rocket_cors::{AllowedOrigins, CorsOptions}; // Import necessary types from rocket_cors
 
 use board::get_end_index;
 use rand::*;
@@ -59,17 +61,20 @@ fn create_game() -> Json<String> {
 
 #[post("/game/<id>/move/<from_index>/<to_index>")]
 fn user_make_move(id: String, from_index: u8, to_index: u8)->Json<board_enc>{
-    let current_board = get_board(id);
+    let current_board = get_board(id.clone());
     let mut board = current_board.unwrap();
     board::make_move(&mut board, from_index, to_index);
+    board::print_board(&board);
+    insert_board(id, board.clone());
     Json(board_enc{
         board: board::board_enc(&board),
     })
 }
 #[post("/game/<id>/engine_move")]
 fn engine_move(id: String)->Json<board_enc>{
-    let current_board = get_board(id);
+    let current_board = get_board(id.clone());
     let mut board = current_board.unwrap();
+    board::print_board(&board);
     let mut evaluator = Evaluation::new();
     let depth = 6;
     let mut best_move = (0,0);
@@ -77,7 +82,9 @@ fn engine_move(id: String)->Json<board_enc>{
             let mut nodes_counted = 0;
             (eval, best_move, nodes_counted) = evaluation::Evaluation::iterative_deepening_ab_pruning(&mut evaluator, &mut board, i32::MIN, i32::MAX, (0,0), depth, false);
     board::make_move(&mut board, best_move.0, best_move.1);
-
+    board::print_board(&board);
+    
+    insert_board(id, board.clone());
     Json(board_enc{
         board: board::board_enc(&board),
     })
@@ -141,11 +148,27 @@ fn generate_unique_id()-> String{
 }
 
 #[rocket::main]
+
 async fn main() {
+    // AllowedOrigins is a list of origins that are allowed to make requests
+    let allowed_origins = AllowedOrigins::all();
+
+    // You can also specify particular origins like so:
+    // let allowed_origins = AllowedOrigins::some_exact(&["http://localhost:3000", "http://localhost:8080"]);
+
+    let cors = CorsOptions { // Create a CorsOptions instance
+        allowed_origins,
+        allowed_methods: vec![Method::Get, Method::Post, Method::Options].into_iter().map(From::from).collect(),
+        allowed_headers: rocket_cors::AllowedHeaders::all(),
+        allow_credentials: true,
+        ..Default::default()
+    }
+    .to_cors().unwrap(); // Convert CorsOptions to Cors fairing
+
     rocket::build()
-        .mount("/", routes![index, create_game]) // Mount both routes at the root
+        .attach(cors) // Attach the CORS fairing to your Rocket application
+        .mount("/", routes![index, create_game, user_make_move, engine_move, send_valid_moves, game, gamer])
         .launch()
         .await
         .unwrap();
 }
-
