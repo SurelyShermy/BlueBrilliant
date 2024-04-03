@@ -1,4 +1,6 @@
 use std::mem;
+use serde::{Serialize, Deserialize};
+
 // A bitboard implementation of a chess board
 
 const INIT_PAWNS: u64 = 1<<8 | 1<<9 | 1<<10 | 1<<11 | 1<<12 | 1<<13 | 1<<14 | 1<<15
@@ -102,7 +104,7 @@ const SOWE: i8 = -9;
 const NOWE: i8 = 7; 
 
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Board {
     pawns: u64,
     knights: u64,
