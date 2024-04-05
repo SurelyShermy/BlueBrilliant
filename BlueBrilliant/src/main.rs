@@ -104,6 +104,7 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
         let sink_id = {
             let mut mutex = owned_game_channel.lock().await;
             let mut sinks = mutex.get_mut(&game_id).unwrap();
+            //Dangerous way to do this, need to fix
             let sink_id = sinks.len();
             sinks.push(sink);
             sink_id
@@ -154,7 +155,12 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                     }
                 },
                 Ok(ws::Message::Ping(data)) => (),
-                Ok(ws::Message::Close(_)) => break,
+                Ok(ws::Message::Close(_)) => {
+                    let mut mutex = owned_game_channel.lock().await;
+                    let mut sinks = mutex.get_mut(&game_id).unwrap();
+                    sinks.remove(sink_id);
+                    break;
+                },
                 Err(e) => {
                     eprintln!("Error: {}", e);
                     // Handle the error
@@ -195,7 +201,6 @@ async fn create_pvp_game(player1_id: String, player2_id: String) -> Json<GameSta
     GAMECHANNELS.lock().await.insert(id.clone(), Vec::new());
     insert_gameState(id.clone(), gameState.clone()).await;
     Json(gameState)
-
 }
 fn assign_player_colors() -> (bool, bool) {
     let mut rng = rand::thread_rng();
@@ -206,25 +211,25 @@ fn assign_player_colors() -> (bool, bool) {
     }
 }
 
-// #[post("/engine_game/<player_id>")]
-// async fn create_engine_game(player_id: String) -> Json<GameState> {
-//     let id = generate_unique_id();
-//     let mut new_board = board::create_board();
-//     let gameState = GameState{
-//         message_type: "GameState".to_string(),
-//         board: new_board.clone(),
-//         game_id: id.clone(),
-//         player1_id: player_id.clone(),
-//         player2_id: "engine".to_string(),
-//         player1_color: false,
-//         player2_color: false,
-//         turn: new_board.is_white_move(),
-//         board_array: board::board_enc(&new_board.clone()),
-//         engine: true
-//     };
-//     insert_gameState(id.clone(), gameState.clone()).await;
-//     Json(gameState)
-// }
+#[post("/engine_game/<player_id>")]
+async fn create_engine_game(player_id: String) -> Json<GameState> {
+    let id = generate_unique_id();
+    let mut new_board = board::create_board();
+    let gameState = GameState{
+        message_type: "GameState".to_string(),
+        board: new_board.clone(),
+        game_id: id.clone(),
+        player1_id: player_id.clone(),
+        player2_id: "engine".to_string(),
+        player1_color: false,
+        player2_color: false,
+        turn: new_board.is_white_move(),
+        board_array: board::board_enc(&new_board.clone()),
+        engine: true
+    };
+    insert_gameState(id.clone(), gameState.clone()).await;
+    Json(gameState)
+}
 
 //endpoint for player color selection modal
 
