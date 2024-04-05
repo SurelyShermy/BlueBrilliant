@@ -33,6 +33,7 @@ enum WebSocketMessage {
     moves_request(moves_request),
     broadcast(Broadcast_GameState),
     game_state(GameState),
+    EngineMoveRequest(EngineMoveRequest),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -89,6 +90,10 @@ struct GameMove {
     fromIndex: u8,
     toIndex: u8,
 }
+#[derive(Clone, Serialize, Deserialize)]
+struct EngineMoveRequest{
+    game_id: String,
+}
 #[derive(Deserialize)]
 struct MessageType {
     message_type: String,
@@ -99,6 +104,7 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
     use rocket::futures::{SinkExt, StreamExt};
     let owned_game_channel = GAMECHANNELS.clone();
     let games = GAMESTATES.clone();
+    let mut evaluator = Evaluation::new();
     ws.channel(move |mut duplex| Box::pin(async move {
         let (mut sink, mut stream) = duplex.split();
         let sink_id = {
@@ -147,6 +153,16 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                             let mut sinks = mutex.get_mut(&game_id).unwrap();
                             let sink = sinks.get_mut(sink_id).unwrap();
                             sink.send(ws::Message::Text(game_state_json)).await.unwrap();
+                        },
+                        Ok(WebSocketMessage::EngineMoveRequest(engine_move_request)) => {
+                            // Handle engine move request
+                            let mut map = games.lock().await;
+                            let game_state = engine_move(&mut map, engine_move_request.game_id.clone(), &mut evaluator).await;
+                            let mut mutex = owned_game_channel.lock().await;
+                            let mut sinks = mutex.get_mut(&game_id).unwrap();
+                            let sink = sinks.get_mut(sink_id).unwrap();
+                            
+                            sink.send(ws::Message::Text(game_state)).await.unwrap();
                         },
                         Err(e) => {
                             eprintln!("Error parsing message: {:?}", e);
@@ -221,12 +237,13 @@ async fn create_engine_game(player_id: String) -> Json<GameState> {
         game_id: id.clone(),
         player1_id: player_id.clone(),
         player2_id: "engine".to_string(),
-        player1_color: false,
+        player1_color: true,
         player2_color: false,
         turn: new_board.is_white_move(),
         board_array: board::board_enc(&new_board.clone()),
         engine: true
     };
+    GAMECHANNELS.lock().await.insert(id.clone(), Vec::new());
     insert_gameState(id.clone(), gameState.clone()).await;
     Json(gameState)
 }
@@ -250,23 +267,25 @@ async fn user_make_move(map: &mut MutexGuard<'_, HashMap<String, GameState>>, id
     serde_json::to_string(&ret).unwrap()
 }
 //endpoint for engine making a move
-async fn engine_move(map: &mut MutexGuard<'_, HashMap<String, GameState>>, id: String)->Json<board_enc>{
+async fn engine_move(map: &mut MutexGuard<'_, HashMap<String, GameState>>, id: String, evaluator: &mut evaluation::Evaluation)->String{
     let current_board = get_board(map, id.clone());
+    let mut maximizer;
     let mut board = current_board.unwrap();
+    if board.is_white_move() {
+        maximizer = true;
+    } else {
+        maximizer = false;
+    }
     board::print_board(&board);
-    let mut evaluator = Evaluation::new();
-    let depth = 6;
+    let depth = 8;
     let mut best_move = (0,0);
             let mut eval = 0;
             let mut nodes_counted = 0;
-            (eval, best_move, nodes_counted) = evaluation::Evaluation::iterative_deepening_ab_pruning(&mut evaluator, &mut board, i32::MIN, i32::MAX, (0,0), depth, false);
+            (eval, best_move, nodes_counted) = evaluation::Evaluation::iterative_deepening_ab_pruning( evaluator, &mut board, i32::MIN, i32::MAX, (0,0), depth, maximizer);
     board::make_move(&mut board, best_move.0, best_move.1);
     board::print_board(&board);
     
-    update_board(map, id, board.clone()).await;
-    Json(board_enc{
-        board: board::board_enc(&board),
-    })
+    serde_json::to_string(&update_board(map, id, board.clone()).await).unwrap()
 }
 lazy_static! {
     static ref GAMESTATES: Arc<Mutex<HashMap<String, GameState>>> = Arc::new(Mutex::new(HashMap::new()));
@@ -375,7 +394,7 @@ async fn main() {
 
     if let Err(e) = rocket::build()
         .attach(cors)
-        .mount("/", routes![game_ws, matchmaking])
+        .mount("/", routes![game_ws, matchmaking, create_engine_game])
         .launch()
         .await
     {
