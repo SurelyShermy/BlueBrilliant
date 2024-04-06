@@ -1,6 +1,7 @@
 
 use crate::board::*;
 use crate::transposition::*;
+
 use std::time::{Duration, Instant};
 
 
@@ -9,12 +10,21 @@ fn flip_index(index: usize) -> usize {
     index ^ 56
 }
 
-const PAWN_VALUE: i32 = 100;
-const KNIGHT_VALUE: i32 = 320;
-const BISHOP_VALUE: i32 = 330;
-const ROOK_VALUE: i32 = 500;
-const QUEEN_VALUE: i32 = 900;
-const KING_VALUE: i32 = 5000;
+const MG_PAWN_VALUE: i32 = 82;
+const MG_KNIGHT_VALUE: i32 = 337;
+const MG_BISHOP_VALUE: i32 = 365;
+const MG_ROOK_VALUE: i32 = 477;
+const MG_QUEEN_VALUE: i32 = 1025;
+const MG_KING_VALUE: i32 = 5000;
+
+const EG_PAWN_VALUE: i32 = 94;
+const EG_KNIGHT_VALUE: i32 = 281;
+const EG_BISHOP_VALUE: i32 = 297;
+const EG_ROOK_VALUE: i32 = 512;
+const EG_QUEEN_VALUE: i32 = 936;
+const EG_KING_VALUE: i32 = 5000;
+
+const MAX_QUIESCENCE_DEPTH: u32 = 5;
 const EXACT: u8 = 0;
 const LOWERBOUND: u8 = 1;
 const UPPERBOUND: u8 = 2;
@@ -23,7 +33,7 @@ const EG_PASSED_PAWN: i32 = 50;
 const BROKEN_PAWN_SHELTER: i32 = -50;
 const ROOK_OPEN_FILE: i32 = 30;
 const ROOK_SEMI_FILE: i32 = 5;
-
+const NULL_MOVE: (u8,u8) = (0,0);
 const MG_PAWN_TABLE: [i32; 64] = [
      0,   0,   0,   0,   0,   0,  0,   0,
     98, 134,  61,  95,  68, 126, 34, -11,
@@ -155,6 +165,7 @@ const EG_KING_TABLE: [i32; 64] = [
   -27, -11,   4,  13,  14,   4,  -5, -17,
   -53, -34, -21, -11, -28, -14, -24, -43
 ];
+
 //File utility functions from https://www.chessprogramming.org/Pawn_Fills
 pub fn north_fill(pawns: u64) -> u64 {
   let mut pawns = pawns;
@@ -184,6 +195,7 @@ impl Evaluation{
         raw_match: 0,
     }
   }
+
   pub fn iterative_deepening_ab_pruning(&mut self, board: &mut Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), max_depth: u32, maximizing_player: bool) -> (i32, (u8, u8), u32) {
     let mut best_move = mve;
     let mut best_score = if maximizing_player { i32::MIN } else { i32::MAX };
@@ -194,26 +206,41 @@ impl Evaluation{
           print!("Final depth was {}\n", depth);
           return (best_score, best_move, total_node_count);
         }
-        let (score, move_at_depth, node_count) = self.ab_pruning(board, initial_alpha, initial_beta, best_move, depth, maximizing_player, start);
+        let (score, move_at_depth, node_count) = self.ab_pruning(board, initial_alpha, initial_beta, best_move, depth, maximizing_player, start, max_depth);
         total_node_count += node_count;
 
-        if (maximizing_player && score > best_score) || (!maximizing_player && score < best_score) {
+        if ((maximizing_player && (score > best_score)) || (!maximizing_player && (score < best_score))) {
+            println!("Depth: {}, Score: {}, Move: {:?}", depth, score, move_at_depth);
+            
             best_move = move_at_depth;
             best_score = score;
+            if (best_move) == NULL_MOVE{
+              println!("The depth this occured at was {}", depth);
+              println!("This occured at node count {}", total_node_count);
+              println!("max depth is {}", max_depth);
+              println!("this is a bad return in iter deepening");
+            }
         }
+    }
+    if (best_move) == NULL_MOVE{
+      println!("this is a bad return in iter deepening outside of loop");
     }
     (best_score, best_move, total_node_count)
   }
-  fn quiescence_search(&mut self, board: &mut Board, alpha: i32, beta: i32, node_count: &mut u32) -> i32 {
+  fn quiescence_search(&mut self, board: &mut Board, alpha: i32, beta: i32, node_count: &mut u32, depth: u32) -> i32 {
     *node_count += 1;
     let mut alpha = alpha;
     let stand_pat = evaluate_board(board);
+    if depth == MAX_QUIESCENCE_DEPTH {
+      return stand_pat;
+    }
     if stand_pat >= beta {
         return beta;
     }
     if alpha < stand_pat {
         alpha = stand_pat;
     }
+    
 
     let capture_moves = capture_moves_only(board);
 
@@ -224,7 +251,7 @@ impl Evaluation{
             for j in 0..4{
               let end = direction | j<<4;
               let mut new_board: Board = simulate_move(board, capture_moves[i], end);
-              let score = self.quiescence_search(&mut new_board, alpha, beta, node_count);
+              let score = -self.quiescence_search(&mut new_board, -beta, -alpha, node_count, depth+1);
               if score >= beta {
                 return beta;
               }
@@ -238,7 +265,7 @@ impl Evaluation{
             for j in 0..4{
               let end = direction | j<<4;
               let mut new_board: Board = simulate_move(board, capture_moves[i], end);
-              let score = self.quiescence_search(&mut new_board, alpha, beta, node_count);
+              let score = -self.quiescence_search(&mut new_board, -beta, -alpha, node_count, depth+1);
               if score >= beta {
                 return beta;
               }
@@ -250,7 +277,7 @@ impl Evaluation{
         }
         else{
           let mut new_board: Board = simulate_move(board, capture_moves[i], capture_moves[i + 1]);
-          let score = self.quiescence_search(&mut new_board, alpha, beta, node_count);
+          let score = -self.quiescence_search(&mut new_board, -beta, -alpha, node_count, depth+1);
           if score >= beta {
             return beta;
           }
@@ -262,7 +289,7 @@ impl Evaluation{
 
     alpha
 }
-  pub fn ab_pruning(&mut self, board: &mut Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), depth: u32, maximizing_player: bool, time: Instant) -> (i32, (u8, u8), u32) {
+  pub fn ab_pruning(&mut self, board: &mut Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), depth: u32, maximizing_player: bool, time: Instant, max_depth: u32) -> (i32, (u8, u8), u32) {
     let mut node_count = 1;
     
     let hash = self.zobrist_keys.compute_hash(board);
@@ -275,15 +302,18 @@ impl Evaluation{
       Some(x) => 'block: {
         // println!("Found in TT");
         if x.open(){
+          if x.best_move().unwrap() == NULL_MOVE{
+            println!("this is a bad return in open cutoff");
+          }
           return (0, mve, node_count);
         }
         x.set_open(true);
         self.raw_match += 1;
-        if x.depth() as u32 >= depth && x.depth() as u32 >= 2 {
+        if x.depth() as u32 >= (max_depth-depth) && x.depth() as u32 >= 4 {
           if x.node_type() == EXACT {
             self.exact_match += 1;
-            if x.is_dummy(){
-              break 'block;
+            if x.best_move().unwrap() == NULL_MOVE{
+              println!("this is a bad return in exact");
             }
             return (x.score(), x.best_move().unwrap(), node_count);
           } else if x.node_type() == LOWERBOUND {
@@ -293,10 +323,24 @@ impl Evaluation{
             self.upper_match += 1;
             beta = initial_beta.min(x.score());
           }
-          if alpha >= beta {
-            x.set_open(false);
-            return (x.score(), x.best_move().unwrap(), node_count);
+          if maximizing_player{
+            if alpha >= beta {
+              x.set_open(false);
+              if x.best_move().unwrap() == NULL_MOVE{
+                println!("this is a bad return in ab cut off");
+              }
+              return (x.score(), x.best_move().unwrap(), node_count);
+            }
+          }else{
+            if beta <= alpha {
+              x.set_open(false);
+              if x.best_move().unwrap() == NULL_MOVE{
+                println!("this is a bad return in ab cut off");
+              }
+              return (x.score(), x.best_move().unwrap(), node_count);
+            }
           }
+          
         }
       }
       None => {
@@ -306,12 +350,20 @@ impl Evaluation{
       }
     }
     if(time.elapsed().as_secs() > 30){
-      return (evaluate_board(board), mve, node_count);
-    }
-    if depth == 0 {
-      // let eval = self.quiescence_search(board, alpha, beta, &mut node_count);
       let eval = evaluate_board(board);
       self.transposition_table.replace(hash, depth, Some(mve), eval, EXACT, false, false);
+      if mve == NULL_MOVE{
+        println!("this is a bad return in time elasped");
+      }
+      return (eval, mve, node_count);
+    }
+    if depth == 0 {
+      let eval = self.quiescence_search(board, alpha, beta, &mut node_count, 0);
+
+      self.transposition_table.replace(hash, depth, Some(mve), eval, EXACT, false, false);
+      if mve == NULL_MOVE{
+        println!("this is a bad return in depth = 0");
+      }
       return (eval, mve, node_count);
     }
     let moves = capture_ordering(board);
@@ -337,13 +389,16 @@ impl Evaluation{
         let mut value = i32::MIN;
   
         for i in (0..moves.len()).step_by(2) {
+            if (moves[i], moves[i+1]) == NULL_MOVE{
+              println!("this is a move gen error");
+            }
             if is_promotion(board, moves[i]){
               if board.is_white_move(){
                 let direction = (moves[i+1]-moves[i]-7)<<6;
                 for j in 0..4{
                   let end = direction | j<<4;
                   let mut new_board: Board = simulate_move(board, moves[i], end);
-                  let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, false, time);
+                  let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, false, time, max_depth);
                   node_count += child_node_count;
                   if score > value {
                       value = score;
@@ -360,7 +415,7 @@ impl Evaluation{
                 for j in 0..4{
                   let end = direction | j<<4;
                   let mut new_board: Board = simulate_move(board, moves[i], end);
-                  let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, false, time);
+                  let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, false, time, max_depth);
                   node_count += child_node_count;
                   if score > value {
                       value = score;
@@ -376,7 +431,7 @@ impl Evaluation{
             else{
 
               let mut new_board: Board = simulate_move(board, moves[i], moves[i + 1]);
-              let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, false, time);
+              let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, false, time, max_depth);
               node_count += child_node_count;
               if score > value {
                   value = score;
@@ -396,20 +451,26 @@ impl Evaluation{
             EXACT
         };
         self.transposition_table.replace(hash, depth, Some(best_move), value, node_type, false, false);
-        // let new_entry = TableEntry::new(self.zobrist_keys.compute_hash(board), depth, Some(best_move), value, node_type, false);        
+        // let new_entry = TableEntry::new(self.zobrist_keys.compute_hash(board), depth, Some(best_move), value, node_type, false);
+        if best_move == NULL_MOVE{
+          println!("this is a return error");
+        }        
         (value, best_move, node_count)
     } else {
 
         let mut value = i32::MAX;
   
         for i in (0..moves.len()).step_by(2) {
+          if (moves[i], moves[i+1]) == NULL_MOVE{
+            println!("this is a move gen error");
+          }
           if is_promotion(board, moves[i]){
             if board.is_white_move(){
               let direction = (moves[i+1]-moves[i]-7)<<6;
               for j in 0..4{
                 let end = direction | j<<4;
                 let mut new_board: Board = simulate_move(board, moves[i], end);
-                let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, true, time);
+                let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, true, time, max_depth);
                 node_count += child_node_count;
                 if score < value {
                   value = score;
@@ -426,7 +487,7 @@ impl Evaluation{
               for j in 0..4{
                 let end = direction | j<<4;
                 let mut new_board: Board = simulate_move(board, moves[i], end);
-                let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, true, time);
+                let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, true, time, max_depth);
                 node_count += child_node_count;
                 if score < value {
                   value = score;
@@ -441,7 +502,7 @@ impl Evaluation{
           }else{
             let mut new_board = simulate_move(board, moves[i], moves[i + 1]);
   
-            let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, true, time);
+            let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, true, time, max_depth);
             node_count += child_node_count;
             if score < value {
                 value = score;
@@ -461,6 +522,9 @@ impl Evaluation{
           EXACT
         };
         self.transposition_table.replace(hash, depth, Some(best_move), value, node_type, false, false);
+        if best_move == NULL_MOVE{
+          println!("this is a return error");
+        }
         (value, best_move, node_count)
     }
   } 
@@ -546,29 +610,29 @@ pub fn calculate_material(board: &Board) -> [i32; 2] {
   let mut bpawns = board.pawns() & board.black();
   while wpawns != 0 {
     let index = wpawns.trailing_zeros() as usize;
-    mgscore += PAWN_VALUE + MG_PAWN_TABLE[flip_index(index)];
-    egscore += PAWN_VALUE + EG_PAWN_TABLE[flip_index(index)];
+    mgscore += MG_PAWN_VALUE + MG_PAWN_TABLE[index];
+    egscore += EG_PAWN_VALUE + EG_PAWN_TABLE[index];
     wpawns &= wpawns - 1;
   }
   while bpawns != 0 {
     let index = bpawns.trailing_zeros() as usize;
-    mgscore -= PAWN_VALUE + MG_PAWN_TABLE[index];
-    egscore -= PAWN_VALUE + EG_PAWN_TABLE[index];
+    mgscore -= MG_PAWN_VALUE + MG_PAWN_TABLE[flip_index(index)];
+    egscore -= EG_PAWN_VALUE + EG_PAWN_TABLE[flip_index(index)];
     bpawns &= bpawns - 1;
   }
   let mut wknights = board.knights() & board.white();
   let mut bknights = board.knights() & board.black();
   while wknights != 0 {
     let index = wknights.trailing_zeros() as usize;
-    mgscore += KNIGHT_VALUE + MG_KNIGHT_TABLE[flip_index(index)];
-    egscore += KNIGHT_VALUE + EG_KNIGHT_TABLE[flip_index(index)];
+    mgscore += MG_KNIGHT_VALUE + MG_KNIGHT_TABLE[index];
+    egscore += EG_KNIGHT_VALUE + EG_KNIGHT_TABLE[index];
     game_phase += knight;
     wknights &= wknights - 1;
   }
   while bknights != 0 {
     let index = bknights.trailing_zeros() as usize;
-    mgscore -= KNIGHT_VALUE + MG_KNIGHT_TABLE[index];
-    egscore -= KNIGHT_VALUE + EG_KNIGHT_TABLE[index];
+    mgscore -= MG_KNIGHT_VALUE + MG_KNIGHT_TABLE[flip_index(index)];
+    egscore -= EG_KNIGHT_VALUE + EG_KNIGHT_TABLE[flip_index(index)];
     game_phase += knight;
     bknights &= bknights - 1;
   }
@@ -576,15 +640,15 @@ pub fn calculate_material(board: &Board) -> [i32; 2] {
   let mut bbishops = board.bishops() & board.black();
   while wbishops != 0 {
     let index = wbishops.trailing_zeros() as usize;
-    mgscore += BISHOP_VALUE + MG_BISHOP_TABLE[flip_index(index)];
-    egscore += BISHOP_VALUE + EG_BISHOP_TABLE[flip_index(index)];
+    mgscore += MG_BISHOP_VALUE + MG_BISHOP_TABLE[index];
+    egscore += EG_BISHOP_VALUE + EG_BISHOP_TABLE[index];
     game_phase += bishop;
     wbishops &= wbishops - 1;
   }
   while bbishops != 0 {
     let index = bbishops.trailing_zeros() as usize;
-    mgscore -= BISHOP_VALUE + MG_BISHOP_TABLE[index];
-    egscore -= BISHOP_VALUE + EG_BISHOP_TABLE[index];
+    mgscore -= MG_BISHOP_VALUE + MG_BISHOP_TABLE[flip_index(index)];
+    egscore -= EG_BISHOP_VALUE + EG_BISHOP_TABLE[flip_index(index)];
     game_phase += bishop;
     bbishops &= bbishops - 1;
   }
@@ -592,15 +656,15 @@ pub fn calculate_material(board: &Board) -> [i32; 2] {
   let mut brooks = board.rooks() & board.black();
   while wrooks != 0 {
     let index = wrooks.trailing_zeros() as usize;
-    mgscore += ROOK_VALUE + MG_ROOK_TABLE[flip_index(index)];
-    egscore += ROOK_VALUE + EG_ROOK_TABLE[flip_index(index)];
+    mgscore += MG_ROOK_VALUE + MG_ROOK_TABLE[index];
+    egscore += EG_ROOK_VALUE + EG_ROOK_TABLE[index];
     game_phase += rook;
     wrooks &= wrooks - 1;
   }
   while brooks != 0 {
     let index = brooks.trailing_zeros() as usize;
-    mgscore -= ROOK_VALUE + MG_ROOK_TABLE[index];
-    egscore -= ROOK_VALUE + EG_ROOK_TABLE[index];
+    mgscore -= MG_ROOK_VALUE + MG_ROOK_TABLE[flip_index(index)];
+    egscore -= EG_ROOK_VALUE + EG_ROOK_TABLE[flip_index(index)];
     game_phase += rook;
     brooks &= brooks - 1;
   }
@@ -608,15 +672,15 @@ pub fn calculate_material(board: &Board) -> [i32; 2] {
   let mut bqueens = board.queens() & board.black();
   while wqueens != 0 {
     let index = wqueens.trailing_zeros() as usize;
-    mgscore += QUEEN_VALUE + MG_QUEEN_TABLE[flip_index(index)];
-    egscore += QUEEN_VALUE + EG_QUEEN_TABLE[flip_index(index)];
+    mgscore += MG_QUEEN_VALUE + MG_QUEEN_TABLE[index];
+    egscore += EG_QUEEN_VALUE + EG_QUEEN_TABLE[index];
     game_phase += queen;
     wqueens &= wqueens - 1;
   }
   while bqueens != 0 {
     let index = bqueens.trailing_zeros() as usize;
-    mgscore -= QUEEN_VALUE + MG_QUEEN_TABLE[index];
-    egscore -= QUEEN_VALUE + EG_QUEEN_TABLE[index];
+    mgscore -= MG_QUEEN_VALUE + MG_QUEEN_TABLE[flip_index(index)];
+    egscore -= EG_QUEEN_VALUE + EG_QUEEN_TABLE[flip_index(index)];
     game_phase += queen;
     bqueens &= bqueens - 1;
   }
@@ -624,14 +688,14 @@ pub fn calculate_material(board: &Board) -> [i32; 2] {
   let mut bkings = board.kings() & board.black();
   while wkings != 0 {
     let index = wkings.trailing_zeros() as usize;
-    mgscore += KING_VALUE + MG_KING_TABLE[flip_index(index)];
-    egscore += KING_VALUE + EG_KING_TABLE[flip_index(index)];
+    mgscore += MG_KING_VALUE + MG_KING_TABLE[index];
+    egscore += EG_KING_VALUE + EG_KING_TABLE[index];
     wkings &= wkings - 1;
   }
   while bkings != 0 {
     let index = bkings.trailing_zeros() as usize;
-    mgscore -= KING_VALUE + MG_KING_TABLE[index];
-    egscore -= KING_VALUE + EG_KING_TABLE[index];
+    mgscore -= MG_KING_VALUE + MG_KING_TABLE[flip_index(index)];
+    egscore -= EG_KING_VALUE + EG_KING_TABLE[flip_index(index)];
     bkings &= bkings - 1;
   }
   if game_phase > 24 {

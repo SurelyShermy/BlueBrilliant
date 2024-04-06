@@ -99,6 +99,12 @@ struct MessageType {
     message_type: String,
 }
 
+lazy_static! {
+    static ref GAMESTATES: Arc<Mutex<HashMap<String, GameState>>> = Arc::new(Mutex::new(HashMap::new()));
+    static ref MATCHMAKING_QUEUE: Mutex<VecDeque<String>> = Mutex::new(VecDeque::new());
+    static ref GAMECHANNELS: Arc<Mutex<HashMap<String, Vec<futures::stream::SplitSink<DuplexStream, ws::Message>>>>> = Arc::new(Mutex::new(HashMap::new()));
+}
+
 #[get ("/ws/<game_id>")]
 async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
     use rocket::futures::{SinkExt, StreamExt};
@@ -138,7 +144,8 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                         },
                         Ok(WebSocketMessage::moves_request(moves_request)) => {
                             // Handle moves request
-                            let result = send_valid_moves(moves_request.game_id, moves_request.from_index).await;
+                            let mut map = games.lock().await;
+                            let result = send_valid_moves(&mut map, moves_request.game_id, moves_request.from_index).await;
                             // let result_to_send = serde_json::to_string(&result).expect("Failed to serialize moves array");
                             let mut mutex = owned_game_channel.lock().await;
                             let mut sinks = mutex.get_mut(&game_id).unwrap();
@@ -156,12 +163,12 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                         },
                         Ok(WebSocketMessage::EngineMoveRequest(engine_move_request)) => {
                             // Handle engine move request
+                            println!("Processing Move Request");
                             let mut map = games.lock().await;
                             let game_state = engine_move(&mut map, engine_move_request.game_id.clone(), &mut evaluator).await;
                             let mut mutex = owned_game_channel.lock().await;
                             let mut sinks = mutex.get_mut(&game_id).unwrap();
                             let sink = sinks.get_mut(sink_id).unwrap();
-                            
                             sink.send(ws::Message::Text(game_state)).await.unwrap();
                         },
                         Err(e) => {
@@ -213,9 +220,9 @@ async fn create_pvp_game(player1_id: String, player2_id: String) -> Json<GameSta
         board_array: board::board_enc(&new_board),
         engine: false,
 
-    };
+    }; 
     GAMECHANNELS.lock().await.insert(id.clone(), Vec::new());
-    insert_gameState(id.clone(), gameState.clone()).await;
+    insert_gameState(&mut GAMESTATES.lock().await, id.clone(), gameState.clone()).await;
     Json(gameState)
 }
 fn assign_player_colors() -> (bool, bool) {
@@ -244,19 +251,19 @@ async fn create_engine_game(player_id: String) -> Json<GameState> {
         engine: true
     };
     GAMECHANNELS.lock().await.insert(id.clone(), Vec::new());
-    insert_gameState(id.clone(), gameState.clone()).await;
+    insert_gameState(&mut GAMESTATES.lock().await, id.clone(), gameState.clone()).await;
     Json(gameState)
 }
 
-//endpoint for player color selection modal
+// //endpoint for player color selection modal
 
-fn set_player_color(map: &mut MutexGuard<'_, HashMap<String, GameState>>, game_id: String, player_color: String) -> Json<GameState> {
-    let color = player_color == "white";
-    map.get_mut(&game_id).unwrap().player1_color = color;
-    map.get_mut(&game_id).unwrap().player2_color = !color;
-    Json(map.get(&game_id).unwrap().clone())
+// fn set_player_color(map: &mut MutexGuard<'_, HashMap<String, GameState>>, game_id: String, player_color: String) -> Json<GameState> {
+//     let color = player_color == "white";
+//     map.get_mut(&game_id).unwrap().player1_color = color;
+//     map.get_mut(&game_id).unwrap().player2_color = !color;
+//     Json(map.get(&game_id).unwrap().clone())
 
-}
+// }
 
 
 async fn user_make_move(map: &mut MutexGuard<'_, HashMap<String, GameState>>, id: String, from_index: u8, to_index: u8)->String{
@@ -277,24 +284,19 @@ async fn engine_move(map: &mut MutexGuard<'_, HashMap<String, GameState>>, id: S
         maximizer = false;
     }
     board::print_board(&board);
-    let depth = 8;
+    let depth = 15;
     let mut best_move = (0,0);
-            let mut eval = 0;
-            let mut nodes_counted = 0;
-            (eval, best_move, nodes_counted) = evaluation::Evaluation::iterative_deepening_ab_pruning( evaluator, &mut board, i32::MIN, i32::MAX, (0,0), depth, maximizer);
+    let mut eval = 0;
+    let mut nodes_counted = 0;
+    println!("Called iterative deepning");
+    (eval, best_move, nodes_counted) = evaluation::Evaluation::iterative_deepening_ab_pruning( evaluator, &mut board, i32::MIN, i32::MAX, (0,0), depth, maximizer);
     board::make_move(&mut board, best_move.0, best_move.1);
     board::print_board(&board);
-    
+    println!("{},{}", best_move.0, best_move.1);
     serde_json::to_string(&update_board(map, id, board.clone()).await).unwrap()
 }
-lazy_static! {
-    static ref GAMESTATES: Arc<Mutex<HashMap<String, GameState>>> = Arc::new(Mutex::new(HashMap::new()));
-    static ref MATCHMAKING_QUEUE: Mutex<VecDeque<String>> = Mutex::new(VecDeque::new());
-    static ref GAMECHANNELS: Arc<Mutex<HashMap<String, Vec<futures::stream::SplitSink<DuplexStream, ws::Message>>>>> = Arc::new(Mutex::new(HashMap::new()));
-}
 
-async fn insert_gameState(key: String, gameState: GameState) {
-    let mut map = GAMESTATES.lock().await;
+async fn insert_gameState(map: & mut MutexGuard<'_, HashMap<String, GameState>>, key: String, gameState: GameState) {
     map.insert(key.to_owned(), gameState);
 }
 
@@ -314,16 +316,17 @@ fn get_board(map: &MutexGuard<HashMap<String, GameState>>, key: String) -> Optio
 }
 
 
-async fn send_valid_moves(id: String, start: u8)->String{
+async fn send_valid_moves(map:& mut MutexGuard<'_, HashMap<String, GameState>>, id: String, start: u8)->String{
     let mut calculated_moves;
     println!("id: {}", id);
-    
-    unsafe{
-        let mut board_guard = GAMESTATES.lock().await;
-        let mut gameState = board_guard.get_mut(&id).unwrap();
-        calculated_moves = get_end_index(&gameState.board.clone(), start);
-        drop(board_guard);
-    }
+    let mut gameState = map.get_mut(&id).unwrap();
+    calculated_moves = get_end_index(&gameState.board.clone(), start);
+    // unsafe{
+    //     let mut board_guard = GAMESTATES.lock().await;
+    //     let mut gameState = board_guard.get_mut(&id).unwrap();
+    //     calculated_moves = get_end_index(&gameState.board.clone(), start);
+    //     drop(board_guard);
+    // }
     let valid_moves = valid_moves{
         message_type: "valid_moves".to_string(),
         moves: calculated_moves,
