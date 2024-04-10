@@ -179,9 +179,13 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                 },
                 Ok(ws::Message::Ping(data)) => (),
                 Ok(ws::Message::Close(_)) => {
-                    let mut mutex = owned_game_channel.lock().await;
-                    let mut sinks = mutex.get_mut(&game_id).unwrap();
-                    sinks.remove(sink_id);
+                    let mut games = GAMECHANNELS.lock().await;
+                    let _= games.get_mut(&game_id).unwrap().remove(sink_id);
+                    let mut game_states = GAMESTATES.lock().await;
+                    let game_state = game_states.get(&game_id).unwrap();
+                    if game_state.engine {
+                        game_states.remove(&game_id);
+                    }
                     break;
                 },
                 Err(e) => {

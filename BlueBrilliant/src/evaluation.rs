@@ -315,6 +315,7 @@ impl Evaluation{
     let mut best_score = if maximizing_player { i32::MIN } else { i32::MAX };
     let mut total_node_count = 0;
     println!("Sanity Check starting eval before loop {}", evaluate_board(board));
+    println!("max depth: {}", max_depth);
     let start = Instant::now();
     for depth in 1..=max_depth {
         if(start.elapsed().as_secs() > 30){
