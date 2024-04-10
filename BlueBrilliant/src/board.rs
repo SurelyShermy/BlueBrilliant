@@ -74,7 +74,7 @@ const BLACK_LONG_DEST_IDX: u8 = 58;
 const BLACK_SHORT_DEST_IDX: u8 = 62;
 const BLACK_LONG_EMPTY: u64 = 1<<57 | 1<<58 | 1<<59;
 const BLACK_SHORT_EMPTY: u64 = 1<<61 | 1<<62;
-// const BLACK_LONG_KING: u64 = 1<<58 | 1<<59 | 1<<60;
+const BLACK_LONG_KING: u64 = 1<<58 | 1<<59 | 1<<60;
 const BLACK_SHORT_KING: u64 = 1<<60 | 1<<61 | 1<<62;
 
 const ALL_SQUARES: u64 = 0xffffffffffffffff;
@@ -292,8 +292,8 @@ fn valid_board(old_board: &Board, start: u8, end: u8) -> Option<Board> {
             board.white_castle_short = false;
         }
         
-        if old_board.white_castle_long && start == WHITE_KING_START_IDX && end == WHITE_LONG_DEST_IDX {
-            if attacks & WHITE_LONG_KING != 0 { 
+        if old_board.black_castle_long && start == BLACK_KING_START_IDX && end == BLACK_LONG_DEST_IDX {
+            if attacks & BLACK_LONG_KING != 0 { 
                 return None;
             } else {
                 return Some(board);
@@ -413,6 +413,7 @@ pub fn is_promotion(board: &Board, start: u8) -> bool {
 //Takes a board and does a move on that board
 pub fn make_move(board: &mut Board, start: u8, end: u8) {
     if board.is_white_move {
+        
         if start >=64 {
             println!("something has gone wrong");
             println!("start: {}", start);
@@ -460,14 +461,32 @@ pub fn make_move(board: &mut Board, start: u8, end: u8) {
                 capture_square(board, end);
                 move_square(board, start, end);
             } else if board.white_castle_long && start == WHITE_KING_START_IDX && end == WHITE_LONG_DEST_IDX {
+                
                 move_square(board, start, end);
                 move_square(board, 0, 3);
             } else if board.white_castle_short && start == WHITE_KING_START_IDX && end == WHITE_SHORT_DEST_IDX {
+                
                 move_square(board, start, end);
                 move_square(board, 7, 5);
             } else {
                 capture_square(board, end);
                 move_square(board, start, end);
+            }
+            if start == WHITE_KING_START_IDX {
+                board.white_castle_long = false;
+                board.white_castle_short = false;
+            }
+            if start == 0 {
+                board.white_castle_long = false;
+            }
+            if start == 7 {
+                board.white_castle_short = false;
+            }
+            if end == 56 {
+                board.black_castle_long = false;
+            }
+            if end == 63 {
+                board.black_castle_short = false;
             }
         }
     } else {
@@ -516,15 +535,34 @@ pub fn make_move(board: &mut Board, start: u8, end: u8) {
                 capture_square(board, end);
                 move_square(board, start, end);
             } else if board.black_castle_long && start == BLACK_KING_START_IDX && end == BLACK_LONG_DEST_IDX {
+                
                 move_square(board, start, end);
                 move_square(board, 56, 59);
             } else if board.black_castle_short && start == BLACK_KING_START_IDX && end == BLACK_SHORT_DEST_IDX {
+                
                 move_square(board, start, end);
                 move_square(board, 63, 61);
             } else {
                 capture_square(board, end);
                 move_square(board, start, end);
             }
+            if start == BLACK_KING_START_IDX {
+                board.black_castle_long = false;
+                board.black_castle_short = false;
+            }
+            if start == 56 {
+                board.black_castle_long = false;
+            }
+            if start == 63 {
+                board.black_castle_short = false;
+            }
+            if end == 0 {
+                board.white_castle_long = false;
+            }
+            if end == 7 {
+                board.white_castle_short = false;
+            }
+            
         }
     }
     board.is_white_move = !(board.is_white_move);
