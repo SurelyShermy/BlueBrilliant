@@ -23,7 +23,7 @@ use evaluation::*;
 use rocket::{post, get, routes};
 use rocket::serde::{Serialize, Deserialize};
 use rocket::serde::json::Json;
-use crate::board::Board;
+use crate::board::{game_over_check, Board};
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "message_type", content = "data")]
@@ -34,18 +34,33 @@ enum WebSocketMessage {
     broadcast(Broadcast_GameState),
     game_state(GameState),
     EngineMoveRequest(EngineMoveRequest),
+    gameOver_request(gameOver_request),
+    gameOver_response(gameOver_response),
+    resign_request(resign_request),
 }
-
+#[derive(Serialize, Deserialize)]
+struct resign_request{
+    game_id: String,
+}
 #[derive(Serialize, Deserialize)]
 struct matchmaking_response{
     game_state: Option<GameState>,
     game_id: Option<String>,
     match_found: bool,
 }
+#[derive(Serialize, Deserialize)]
+struct gameOver_request{
+    game_id: String,
+}
+#[derive(Serialize, Deserialize)]
+struct gameOver_response{
+    message_type: String,
+    result: String,
+}
 
 #[derive(Serialize, Deserialize)]
 struct moves_request{
-    from_index: u8,
+    fromIndex: u8,
     game_id: String,
 }
 
@@ -145,7 +160,7 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                         Ok(WebSocketMessage::moves_request(moves_request)) => {
                             // Handle moves request
                             let mut map = games.lock().await;
-                            let result = send_valid_moves(&mut map, moves_request.game_id, moves_request.from_index).await;
+                            let result = send_valid_moves(&mut map, moves_request.game_id, moves_request.fromIndex).await;
                             // let result_to_send = serde_json::to_string(&result).expect("Failed to serialize moves array");
                             let mut mutex = owned_game_channel.lock().await;
                             let mut sinks = mutex.get_mut(&game_id).unwrap();
@@ -170,6 +185,39 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                             let mut sinks = mutex.get_mut(&game_id).unwrap();
                             let sink = sinks.get_mut(sink_id).unwrap();
                             sink.send(ws::Message::Text(game_state)).await.unwrap();
+                        },
+                        Ok(WebSocketMessage::gameOver_request(gameOver_request)) => {
+                            let mut map = games.lock().await;
+                            let game_state = map.get(&gameOver_request.game_id).unwrap();
+                            let game_result: String = game_over_check(&game_state.board.clone());
+                            let game_over_response = gameOver_response{
+                                message_type: "gameOver_response".to_string(),
+                                result: game_result.clone(),
+                            };
+                            let game_over_response_json = serde_json::to_string(&game_over_response).expect("Failed to serialize game over response");
+                            let mut mutex = owned_game_channel.lock().await;
+                            let mut sinks = mutex.get_mut(&game_id).unwrap();
+                            for sink in sinks.iter_mut(){
+                                sink.send(ws::Message::Text(game_over_response_json.clone())).await.unwrap();
+                            }
+                            if game_result == "Checkmate" || game_result == "Stalemate" {
+                                map.remove(&gameOver_request.game_id);
+                            }
+                        },
+                        Ok(WebSocketMessage::resign_request(resign_request)) => {
+                            let mut map = games.lock().await;
+                            let game_result: String = "Resignation".to_string();
+                            let game_over_response = gameOver_response{
+                                message_type: "gameOver_response".to_string(),
+                                result: game_result.clone(),
+                            };
+                            let game_over_response_json = serde_json::to_string(&game_over_response).expect("Failed to serialize game over response");
+                            let mut mutex = owned_game_channel.lock().await;
+                            let mut sinks = mutex.get_mut(&game_id).unwrap();
+                            for sink in sinks.iter_mut(){
+                                sink.send(ws::Message::Text(game_over_response_json.clone())).await.unwrap();
+                            }
+                            map.remove(&game_id);
                         },
                         Err(e) => {
                             eprintln!("Error parsing message: {:?}", e);
@@ -303,6 +351,7 @@ async fn engine_move(map: &mut MutexGuard<'_, HashMap<String, GameState>>, id: S
 async fn insert_gameState(map: & mut MutexGuard<'_, HashMap<String, GameState>>, key: String, gameState: GameState) {
     map.insert(key.to_owned(), gameState);
 }
+
 
 async fn update_board(map: & mut MutexGuard<'_, HashMap<String, GameState>>, key: String, board: Board)-> GameState{
     let game_state = map.get_mut(&key).expect("Error: Game state not found for the given key");

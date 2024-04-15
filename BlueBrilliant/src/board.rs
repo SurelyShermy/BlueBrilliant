@@ -236,6 +236,17 @@ pub fn print_move_trees(board: &Board, depth: u8){
 *   king is in check at end of move
 *   king is in check at start of a castle
 */ 
+pub fn game_over_check(board: &Board) -> String {
+    let moves: Vec<u8> = generate_legal_moves(board);
+    if moves.len() == 0{
+        if is_check(board){
+            return "Checkmate".to_string();
+        } else {
+            return "Stalemate".to_string();
+        }
+    }
+    return "False".to_string();
+}
 fn valid_board(old_board: &Board, start: u8, end: u8) -> Option<Board> {
     let mut board: Board = simulate_move(old_board, start, end); 
     let attacks: u64 = generate_attacks(&board); 
