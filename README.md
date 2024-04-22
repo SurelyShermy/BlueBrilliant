@@ -60,7 +60,7 @@ Another interesting algorithm to look at is montecarlo search but not sure if th
 ## Acknowledgements
 
 1. Alex Sherman
-2.
+2. Liam Richards
 3.
 4.
 5.
