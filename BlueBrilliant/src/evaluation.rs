@@ -309,7 +309,6 @@ impl Evaluation{
         raw_match: 0,
     }
   }
-
   pub fn iterative_deepening_ab_pruning(&mut self, board: &mut Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), max_depth: u32, maximizing_player: bool) -> (i32, (u8, u8), u32) {
     let mut best_move = mve;
     let mut best_score = if maximizing_player { i32::MIN } else { i32::MAX };
@@ -322,7 +321,7 @@ impl Evaluation{
           print!("Final depth was {}\n", depth);
           return (best_score, best_move, total_node_count);
         }
-        let (score, move_at_depth, node_count) = self.ab_pruning(board, initial_alpha, initial_beta, best_move, depth, maximizing_player, start, max_depth);
+        let (score, move_at_depth, node_count) = self.ab_pruning(board, initial_alpha, initial_beta, best_move, depth, maximizing_player, start, max_depth, 0);
         total_node_count += node_count;
 
         if (depth > 4 && ((maximizing_player && (score > best_score)) || (!maximizing_player && (score < best_score)))) {
@@ -359,7 +358,6 @@ impl Evaluation{
     
 
     let capture_moves = capture_moves_only(board);
-
     for i in (0..capture_moves.len()).step_by(2) {
         if is_promotion(board, capture_moves[i]){
           if board.is_white_move(){
@@ -367,6 +365,7 @@ impl Evaluation{
             for j in 0..4{
               let end = direction | j<<4;
               let mut new_board: Board = simulate_move(board, capture_moves[i], end);
+
               let score = -self.quiescence_search(&mut new_board, -beta, -alpha, node_count, depth+1);
               if score >= beta {
                 return beta;
@@ -405,12 +404,14 @@ impl Evaluation{
 
     alpha
 }
-  pub fn ab_pruning(&mut self, board: &mut Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), depth: u32, maximizing_player: bool, time: Instant, max_depth: u32) -> (i32, (u8, u8), u32) {
+  pub fn ab_pruning(&mut self, board: &mut Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), depth: u32, maximizing_player: bool, time: Instant, max_depth: u32, ply: u32) -> (i32, (u8, u8), u32) {
     let mut node_count = 1;
     
     let hash = self.zobrist_keys.compute_hash(board);
     let ttval = self.transposition_table.lookup(hash);
-
+    if can_claim_draw(board, hash){
+      return (0, mve, node_count);
+    }
     // //Pass by reference instead?
     let mut alpha = initial_alpha;
     let mut beta = initial_beta;
@@ -421,11 +422,13 @@ impl Evaluation{
           if x.best_move().unwrap() == NULL_MOVE{
             println!("this is a bad return in open cutoff");
           }
-          return (0, mve, node_count);
+          x.set_open(false);
+          return (0, x.best_move().unwrap(), node_count);
         }
         x.set_open(true);
         self.raw_match += 1;
-        if x.depth() as u32 >= (max_depth-depth) && x.depth() as u32 >= 4 {
+        //If the depth that we are searching is greater than or equal to the depth of the stored position in the transposition table
+        if x.depth() as u32 >= (depth) && x.depth() as u32 >= 4 {
           if x.node_type() == EXACT {
             self.exact_match += 1;
             if x.best_move().unwrap() == NULL_MOVE{
@@ -460,9 +463,9 @@ impl Evaluation{
         }
       }
       None => {
-        //setting to true since this position has not been reached 
-        let new_entry: TableEntry = TableEntry::new(hash, depth, Some(mve), 0, EXACT, true, true);
-        self.transposition_table.store(new_entry);
+        // //setting to true since this position has not been reached 
+        // let new_entry: TableEntry = TableEntry::new(hash, depth, Some(mve), 0, EXACT, true, true);
+        // self.transposition_table.store(new_entry);
       }
     }
     if(time.elapsed().as_secs() > 30){
@@ -514,7 +517,8 @@ impl Evaluation{
                 for j in 0..4{
                   let end = direction | j<<4;
                   let mut new_board: Board = simulate_move(board, moves[i], end);
-                  let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, false, time, max_depth);
+                  *new_board.position_counts().entry(hash).or_insert(0)+=1;
+                  let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, false, time, max_depth, ply+1);
                   node_count += child_node_count;
                   if score > value {
                       value = score;
@@ -531,7 +535,8 @@ impl Evaluation{
                 for j in 0..4{
                   let end = direction | j<<4;
                   let mut new_board: Board = simulate_move(board, moves[i], end);
-                  let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, false, time, max_depth);
+                  *new_board.position_counts().entry(hash).or_insert(0)+=1;
+                  let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, false, time, max_depth, ply+1);
                   node_count += child_node_count;
                   if score > value {
                       value = score;
@@ -545,9 +550,9 @@ impl Evaluation{
               }
             }
             else{
-
               let mut new_board: Board = simulate_move(board, moves[i], moves[i + 1]);
-              let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, false, time, max_depth);
+              *new_board.position_counts().entry(hash).or_insert(0)+=1;
+              let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, false, time, max_depth, ply+1);
               node_count += child_node_count;
               if score > value {
                   value = score;
@@ -586,7 +591,8 @@ impl Evaluation{
               for j in 0..4{
                 let end = direction | j<<4;
                 let mut new_board: Board = simulate_move(board, moves[i], end);
-                let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, true, time, max_depth);
+                *new_board.position_counts().entry(hash).or_insert(0)+=1;
+                let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, true, time, max_depth, ply+1);
                 node_count += child_node_count;
                 if score < value {
                   value = score;
@@ -603,7 +609,8 @@ impl Evaluation{
               for j in 0..4{
                 let end = direction | j<<4;
                 let mut new_board: Board = simulate_move(board, moves[i], end);
-                let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, true, time, max_depth);
+                *new_board.position_counts().entry(hash).or_insert(0)+=1;
+                let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, true, time, max_depth, ply+1);
                 node_count += child_node_count;
                 if score < value {
                   value = score;
@@ -617,8 +624,8 @@ impl Evaluation{
             }
           }else{
             let mut new_board = simulate_move(board, moves[i], moves[i + 1]);
-  
-            let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, true, time, max_depth);
+            *new_board.position_counts().entry(hash).or_insert(0)+=1;
+            let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, true, time, max_depth, ply+1);
             node_count += child_node_count;
             if score < value {
                 value = score;

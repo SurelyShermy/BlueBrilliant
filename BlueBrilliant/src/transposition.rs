@@ -222,6 +222,15 @@ impl TranspositionTable {
         self.table.get_mut(&hash)
     }
     pub fn replace(&mut self, hash: u64, depth: u32, best_move: Option<(u8, u8)>, score: i32, node_type: u8, open: bool, is_dummy: bool) {
-        self.table.get_mut(&hash).unwrap().set_entry(depth, best_move, score, node_type, open, is_dummy);
+        match self.table.get(&hash) {
+            Some(entry) => {
+                if entry.depth() <= depth {
+                    self.table.get_mut(&hash).unwrap().set_entry(depth, best_move, score, node_type, open, is_dummy);
+                }
+            }
+            None => {
+                self.table.insert(hash, TableEntry::new(hash, depth, best_move, score, node_type, open, is_dummy));
+            }
+        }
     }
 }

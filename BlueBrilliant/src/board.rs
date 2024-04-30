@@ -1,6 +1,7 @@
 use std::mem;
 use serde::{Serialize, Deserialize};
-
+use std::collections::HashMap;
+use crate::transposition::Zobrist;
 // A bitboard implementation of a chess board
 
 const INIT_PAWNS: u64 = 1<<8 | 1<<9 | 1<<10 | 1<<11 | 1<<12 | 1<<13 | 1<<14 | 1<<15
@@ -119,6 +120,7 @@ pub struct Board {
     black_castle_long: bool,
     black_castle_short: bool,
     is_white_move: bool,
+    position_counts: HashMap<u64, u32>,
 }
 
 impl Board {
@@ -182,6 +184,9 @@ impl Board {
     pub fn is_white_move(&self) -> bool {
         self.is_white_move
     }
+    pub fn position_counts(&mut self) -> &mut HashMap<u64, u32> {
+        &mut self.position_counts
+    }
 }
 
 pub fn create_board() -> Board {
@@ -198,10 +203,16 @@ pub fn create_board() -> Board {
         white_castle_short: true,
         black_castle_long: true,
         black_castle_short: true,
-        is_white_move: true
+        is_white_move: true,
+        position_counts: HashMap::new(),
     }
 }
-
+pub fn can_claim_draw(board: &Board, hash: u64) -> bool {
+    if board.position_counts.contains_key(&hash) {
+        return board.position_counts[&hash] >= 3;
+    }
+    return false;
+}
 fn number_of_descendents(board: &Board, depth: u8) -> u64{
     let mut current: Vec<Board> = Vec::new();
     let mut next: Vec<Board> = Vec::new();
@@ -576,6 +587,7 @@ pub fn make_move(board: &mut Board, start: u8, end: u8) {
             
         }
     }
+    // board.position_counts.entry(board.zobrist_keys.compute_hash(board)).or_insert(0) +=1;
     board.is_white_move = !(board.is_white_move);
 }
 
