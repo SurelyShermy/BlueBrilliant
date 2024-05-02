@@ -509,7 +509,7 @@ fn generate_unique_id()-> String{
 async fn main() {
     // AllowedOrigins is a list of origins that are allowed to make requests
     // You can also specify particular origins like so:
-    let allowed_origins = AllowedOrigins::some_exact(&["http://localhost:4000", "http://localhost:8080", "https://localhost"]);
+    let allowed_origins = AllowedOrigins::some_exact(&["http://localhost:4000", "http://localhost:8080", "https://localhost", "159.203.107.176"]);
 
     let cors = CorsOptions { // Create a CorsOptions instance
         allowed_origins,
