@@ -398,13 +398,13 @@ async fn user_make_move(map: &mut MutexGuard<'_, HashMap<String, GameState>>, id
 //endpoint for engine making a move
 async fn engine_move(map: &mut MutexGuard<'_, HashMap<String, GameState>>, id: String, evaluator: &mut evaluation::Evaluation)->String{
     let current_board = get_board(map, id.clone());
-    let mut maximizer;
+    let mut maximizer = false;
     let mut board = current_board.unwrap();
-    if board.is_white_move() {
-        maximizer = true;
-    } else {
-        maximizer = false;
-    }
+    // if board.is_white_move() {
+    //     maximizer = true;
+    // } else {
+    //     maximizer = false;
+    // }
     board::print_board(&board);
     let depth = 15;
     let mut best_move = (0,0);
@@ -509,7 +509,7 @@ fn generate_unique_id()-> String{
 async fn main() {
     // AllowedOrigins is a list of origins that are allowed to make requests
     // You can also specify particular origins like so:
-    let allowed_origins = AllowedOrigins::some_exact(&["http://localhost:4000", "http://localhost:8080"]);
+    let allowed_origins = AllowedOrigins::some_exact(&["http://localhost:4000", "http://localhost:8080", "https://localhost"]);
 
     let cors = CorsOptions { // Create a CorsOptions instance
         allowed_origins,
