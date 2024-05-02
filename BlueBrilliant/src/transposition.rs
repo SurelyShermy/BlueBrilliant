@@ -150,18 +150,17 @@ pub struct TableEntry{
     best_move: Option<(u8, u8)>,
     score: i32,
     node_type: u8,
-    open: bool,
+    // open: bool,
     is_dummy: bool,
 }
 impl TableEntry{
-    pub fn new(key: u64, depth: u32, best_move: Option<(u8, u8)>, score: i32, node_type: u8, open: bool, is_dummy: bool) -> TableEntry{
+    pub fn new(key: u64, depth: u32, best_move: Option<(u8, u8)>, score: i32, node_type: u8, is_dummy: bool) -> TableEntry{
         TableEntry{
             key,
             depth,
             best_move,
             score,
             node_type,
-            open,
             is_dummy,
         }
     }
@@ -180,21 +179,21 @@ impl TableEntry{
     pub fn node_type(&self) -> u8{
         self.node_type
     }
-    pub fn open(&self) -> bool{
-        self.open
-    }
+    // pub fn open(&self) -> bool{
+    //     self.open
+    // }
     pub fn is_dummy(&self) -> bool{
         self.is_dummy
     }
-    pub fn set_open(&mut self, open: bool){
-        self.open = open;
-    }
-    pub fn set_entry(&mut self, depth: u32, best_move: Option<(u8, u8)>, score: i32, node_type: u8, open: bool, is_dummy: bool){
+    // pub fn set_open(&mut self, open: bool){
+    //     self.open = open;
+    // }
+    pub fn set_entry(&mut self, depth: u32, best_move: Option<(u8, u8)>, score: i32, node_type: u8, is_dummy: bool){
         self.depth = depth;
         self.best_move = best_move;
         self.score = score;
         self.node_type = node_type;
-        self.open = open;
+        // self.open = open;
         self.is_dummy = is_dummy;
     }
 
@@ -221,15 +220,15 @@ impl TranspositionTable {
     pub fn lookup(&mut self, hash: u64) -> Option<&mut TableEntry> {
         self.table.get_mut(&hash)
     }
-    pub fn replace(&mut self, hash: u64, depth: u32, best_move: Option<(u8, u8)>, score: i32, node_type: u8, open: bool, is_dummy: bool) {
+    pub fn replace(&mut self, hash: u64, depth: u32, best_move: Option<(u8, u8)>, score: i32, node_type: u8, is_dummy: bool) {
         match self.table.get(&hash) {
             Some(entry) => {
                 if entry.depth() <= depth {
-                    self.table.get_mut(&hash).unwrap().set_entry(depth, best_move, score, node_type, open, is_dummy);
+                    self.table.get_mut(&hash).unwrap().set_entry(depth, best_move, score, node_type, is_dummy);
                 }
             }
             None => {
-                self.table.insert(hash, TableEntry::new(hash, depth, best_move, score, node_type, open, is_dummy));
+                self.table.insert(hash, TableEntry::new(hash, depth, best_move, score, node_type, is_dummy));
             }
         }
     }
