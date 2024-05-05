@@ -426,7 +426,7 @@ impl Evaluation{
         // println!("Found in TT");
         self.raw_match += 1;
         //If the depth that we are searching is greater than or equal to the depth of the stored position in the transposition table
-        if x.depth() as u32 >= (ply) && x.depth() as u32 >= 4  && x.is_dummy() == false{
+        if x.depth() as u32 >= (depth) && x.depth() as u32 >= 4  && x.is_dummy() == false{
           if x.node_type() == EXACT {
             self.exact_match += 1;
             if x.best_move().unwrap() == NULL_MOVE{
@@ -460,7 +460,7 @@ impl Evaluation{
       }
       None => {
         //setting to true since this position has not been reached 
-        let new_entry: TableEntry = TableEntry::new(hash, ply, Some(mve), 0, EXACT, true);
+        let new_entry: TableEntry = TableEntry::new(hash, depth, Some(mve), 0, EXACT, true);
         self.transposition_table.store(new_entry);
       }
     }
@@ -480,7 +480,7 @@ impl Evaluation{
     //   return (eval, mve, node_count);
     // }
     if depth == 0 {
-      let eval = self.quiescence_search(board, alpha, beta, &mut node_count, 0);
+      let eval = evaluate_board(board);
       return (eval, mve, node_count);
     }
     let moves = ab_move_generation(board);
@@ -488,11 +488,11 @@ impl Evaluation{
         if is_check(board) {
             if maximizing_player {
                 //Should node type here be exact??
-                self.transposition_table.replace(hash, ply, Some(mve), i32::MAX - depth as i32, LOWERBOUND, false);
+                self.transposition_table.replace(hash, depth, Some(mve), i32::MAX - depth as i32, LOWERBOUND, false);
                 // let new_entry = TableEntry::new(self.zobrist_keys.compute_hash(board), depth, Some(mve), i32::MIN + depth as i32, LOWERBOUND, false);
                 return (i32::MIN + depth as i32, mve, node_count);
             } else {
-                self.transposition_table.replace(hash, ply, Some(mve), i32::MIN + depth as i32, UPPERBOUND, false);
+                self.transposition_table.replace(hash, depth, Some(mve), i32::MIN + depth as i32, UPPERBOUND, false);
                 // let new_entry = TableEntry::new(self.zobrist_keys.compute_hash(board), depth, Some(mve), i32::MAX - depth as i32, UPPERBOUND, false);
                 return (i32::MAX - depth as i32, mve, node_count);
             }
@@ -569,7 +569,7 @@ impl Evaluation{
         } else {
             EXACT
         };
-        self.transposition_table.replace(hash, ply, Some(best_move), value, node_type, false);
+        self.transposition_table.replace(hash, depth, Some(best_move), value, node_type, false);
         // let new_entry = TableEntry::new(self.zobrist_keys.compute_hash(board), depth, Some(best_move), value, node_type, false);
         if best_move == NULL_MOVE{
           println!("this is a return error");
@@ -639,7 +639,7 @@ impl Evaluation{
         } else {
           EXACT
         };
-        self.transposition_table.replace(hash, ply, Some(best_move), value, node_type, false);
+        self.transposition_table.replace(hash, depth, Some(best_move), value, node_type, false);
         if best_move == NULL_MOVE{
           println!("this is a return error");
         }

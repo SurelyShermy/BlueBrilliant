@@ -5,6 +5,7 @@ pub mod transposition;
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::vec;
+use std::time::{Instant, Duration};
 use lazy_static::lazy_static;
 use rocket::http::Method; // Import Method from rocket::http
 use rocket_cors::{AllowedOrigins, CorsOptions}; // Import necessary types from rocket_cors
@@ -37,6 +38,7 @@ enum WebSocketMessage {
     gameOver_request(gameOver_request),
     gameOver_response(gameOver_response),
     resign_request(resign_request),
+    time_update(time_update),
 }
 #[derive(Serialize, Deserialize)]
 struct resign_request{
@@ -89,6 +91,12 @@ struct GameState{
     board_array: vec::Vec<u8>,
     engine: bool,
     game_over: bool,
+    player1_time: u32,
+    player2_time: u32,
+}
+#[derive(Clone, Serialize, Deserialize)]
+struct time_update{
+    gameId: String,
 }
 #[derive(Clone, Serialize, Deserialize)]
 struct Broadcast_GameState{
@@ -139,8 +147,10 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                     sink_id
                 },
                 None => {panic!("Game not found in sink mutex!")}
-            }            
+            }             
         };
+        let mut last_tick = Instant::now();
+        let tick_duration = Duration::from_secs(1);
         while let Some(message) = stream.next().await {
             match message{
                 Ok(ws::Message::Text(text)) =>{
@@ -229,14 +239,22 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                             let game_state = map.get_mut(&gameOver_request.game_id);
                             match game_state{
                                 Some(game_state) => {
-                                    let game_result: String = game_over_check(&game_state.board.clone());
+                                    let mut game_result: String = game_over_check(&game_state.board.clone());
                                     if game_result != "False"{
-                                        game_state.game_over = true;
+                                        if game_state.player1_time == 0 || game_state.player2_time == 0{
+                                            if game_state.player1_time == 0{
+                                                game_result = "Player 2 wins on time".to_string();
+                                            }else{
+                                                game_result = "Player 1 wins on time".to_string();
+                                            }
+                                            game_state.game_over = true;
+                                        }
                                     }
                                     let game_over_response = gameOver_response{
                                         message_type: "gameOver_response".to_string(),
                                         result: game_result.clone(),
                                     };
+
                                     let game_over_response_json = serde_json::to_string(&game_over_response).expect("Failed to serialize game over response");
                                     let mut mutex = owned_game_channel.lock().await;
                                     let mut sinks_mutex = mutex.get_mut(&game_id);
@@ -254,6 +272,7 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                         },
                         Ok(WebSocketMessage::resign_request(resign_request)) => {
                             let mut map = games.lock().await;
+                            
                             let game_result: String = "Resignation".to_string();
                             let game_state_option = map.get_mut(&resign_request.game_id);
                             match game_state_option{
@@ -281,13 +300,77 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                         Err(e) => {
                             eprintln!("Error parsing message: {:?}", e);
                         },
+                        Ok(WebSocketMessage::time_update(time_update)) => {
+                            let mut game_states = games.lock().await;
+                            if let Some(game_state) = game_states.get_mut(&game_id) {
+                                if game_state.turn {
+                                    game_state.player1_time -= 1;
+                                    if game_state.player1_time == 0 {
+                                        game_state.game_over = true;
+                                        let game_over_response = gameOver_response{
+                                            message_type: "gameOver_response".to_string(),
+                                            result: "Player 2 wins on time".to_string(),
+                                        };
+                                        let game_over_response_json = serde_json::to_string(&game_over_response).expect("Failed to serialize game over response");
+                                        let mut mutex = owned_game_channel.lock().await;
+                                        let sinks_mutex = mutex.get_mut(&game_id);
+                                        match sinks_mutex{
+                                            Some(sinks) => {
+                                                for sink in sinks.iter_mut(){
+                                                    sink.send(ws::Message::Text(game_over_response_json.clone())).await.unwrap();
+                                                }
+                                            },
+                                            None => {}
+                                        }
+                                    }
+                                } else {
+                                    game_state.player2_time -= 1;
+                                    if game_state.player1_time == 0 {
+                                        game_state.game_over = true;
+                                        let game_over_response = gameOver_response{
+                                            message_type: "gameOver_response".to_string(),
+                                            result: "Player 1 wins on time".to_string(),
+                                        };
+                                        let game_over_response_json = serde_json::to_string(&game_over_response).expect("Failed to serialize game over response");
+                                        let mut mutex = owned_game_channel.lock().await;
+                                        let sinks_mutex = mutex.get_mut(&game_id);
+                                        match sinks_mutex{
+                                            Some(sinks) => {
+                                                for sink in sinks.iter_mut(){
+                                                    sink.send(ws::Message::Text(game_over_response_json.clone())).await.unwrap();
+                                                }
+                                            },
+                                            None => {}
+                                        }
+                                    }
+                                }
+                                // Broadcast time update to both players
+                                let time_update = serde_json::to_string(&game_state).expect("Failed to serialize game state");
+                                let mut mutex = owned_game_channel.lock().await;
+                                if let Some(sinks) = mutex.get_mut(&game_id) {
+                                    for sink in sinks.iter_mut() {
+                                        sink.send(ws::Message::Text(time_update.clone())).await.unwrap();
+                                    }
+                                }
+                            }
+                        },
                         _=>(),
                     }
                 },
                 Ok(ws::Message::Ping(data)) => (),
                 Ok(ws::Message::Close(_)) => {
                     let mut games = GAMECHANNELS.lock().await;
-                    let _= games.get_mut(&game_id).unwrap().remove(sink_id);
+                    match games.get_mut(&game_id){
+                        Some(sinks) => {
+                            for sink in sinks.iter_mut(){
+                                sink.close().await.unwrap();
+                            }
+                            for sink in sinks.len()..0{
+                                sinks.pop();
+                            }
+                        },
+                        None => {}
+                    }
                     let mut game_states = GAMESTATES.lock().await;
                     let game_state_option = game_states.get(&game_id);
                     match game_state_option {
@@ -304,7 +387,8 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                     eprintln!("Error: {}", e);
                     // Handle the error
                 },
-                _=>(),
+                _ => (),
+
             }
         }
         Ok(())
@@ -339,6 +423,8 @@ async fn create_pvp_game(player1_id: String, player2_id: String) -> Json<GameSta
         player2_color: player2_color,
         turn: new_board.is_white_move(), //should always be true but just in case
         board_array: board::board_enc(&new_board),
+        player1_time: 600,
+        player2_time: 600,
         engine: false,
         game_over: false,
     }; 
@@ -369,6 +455,8 @@ async fn create_engine_game(player_id: String) -> Json<GameState> {
         player2_color: false,
         turn: new_board.is_white_move(),
         board_array: board::board_enc(&new_board.clone()),
+        player1_time: 600,
+        player2_time: 600,
         engine: true,
         game_over: false,
     };
@@ -509,7 +597,7 @@ fn generate_unique_id()-> String{
 async fn main() {
     // AllowedOrigins is a list of origins that are allowed to make requests
     // You can also specify particular origins like so:
-    let allowed_origins = AllowedOrigins::some_exact(&["http://localhost:4000", "http://localhost:8080", "https://localhost", "159.203.107.176"]);
+    let allowed_origins = AllowedOrigins::some_exact(&["http://localhost:4000", "http://localhost:8080", "https://localhost", "https://159.203.107.176"]);
 
     let cors = CorsOptions { // Create a CorsOptions instance
         allowed_origins,
