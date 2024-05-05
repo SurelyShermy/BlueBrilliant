@@ -39,9 +39,15 @@ enum WebSocketMessage {
     gameOver_response(gameOver_response),
     resign_request(resign_request),
     time_update(time_update),
+    rematch_request(rematch_request),
 }
 #[derive(Serialize, Deserialize)]
 struct resign_request{
+    game_id: String,
+    player: String,
+}
+#[derive(Serialize, Deserialize)]
+struct rematch_request{
     game_id: String,
 }
 #[derive(Serialize, Deserialize)]
@@ -240,14 +246,20 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                             match game_state{
                                 Some(game_state) => {
                                     let mut game_result: String = game_over_check(&game_state.board.clone());
-                                    if game_result != "False"{
+                                    if game_result == "False"{
                                         if game_state.player1_time == 0 || game_state.player2_time == 0{
                                             if game_state.player1_time == 0{
-                                                game_result = "Player 2 wins on time".to_string();
+                                                game_result = game_state.player2_id.clone() + " wins on time";
                                             }else{
-                                                game_result = "Player 1 wins on time".to_string();
+                                                game_result = game_state.player1_id.clone() + " wins on time";
                                             }
                                             game_state.game_over = true;
+                                        }
+                                    }else if game_result == "Black wins"{
+                                        if game_state.player1_color{
+                                            game_result = format!("{} wins", game_state.player2_id.clone());
+                                        }else{
+                                            game_result = format!("{} wins", game_state.player1_id.clone());
                                         }
                                     }
                                     let game_over_response = gameOver_response{
@@ -272,15 +284,27 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                         },
                         Ok(WebSocketMessage::resign_request(resign_request)) => {
                             let mut map = games.lock().await;
-                            
-                            let game_result: String = "Resignation".to_string();
                             let game_state_option = map.get_mut(&resign_request.game_id);
+                            let mut loser= "".to_string();
+                            let mut winner = "".to_string();
                             match game_state_option{
                                 Some(game_state) => {
                                     game_state.game_over = true;
+                                    loser = if game_state.player1_id == resign_request.player{
+                                        game_state.player1_id.clone()
+                                    }else{
+                                        game_state.player2_id.clone()
+                                    };
+                                    winner = if game_state.player1_id == resign_request.player{
+                                        game_state.player2_id.clone()
+                                    }else{
+                                        game_state.player1_id.clone()
+                                    };
+
                                 },
                                 None => {}
                             }
+                            let game_result = format!("{} {} resigned", winner, loser);
                             let game_over_response = gameOver_response{
                                 message_type: "gameOver_response".to_string(),
                                 result: game_result.clone(),
@@ -300,6 +324,32 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                         Err(e) => {
                             eprintln!("Error parsing message: {:?}", e);
                         },
+                        Ok(WebSocketMessage::rematch_request(rematch_request)) =>{
+                            let mut map = games.lock().await;
+                            let game_state_option = map.get_mut(&rematch_request.game_id);
+                            match game_state_option{
+                                Some(game_state) => {
+                                    game_state.board = board::create_board();
+                                    game_state.turn = game_state.board.is_white_move();
+                                    game_state.board_array = board::board_enc(&game_state.board);
+                                    game_state.game_over = false;
+                                    game_state.player1_time = 600;
+                                    game_state.player2_time = 600;
+                                    let game_state_json = serde_json::to_string(&game_state).expect("Failed to serialize game state");
+                                    let mut mutex = owned_game_channel.lock().await;
+                                    let sinks_mutex = mutex.get_mut(&game_id);
+                                    match sinks_mutex{
+                                        Some(sinks) => {
+                                            for sink in sinks.iter_mut(){
+                                                sink.send(ws::Message::Text(game_state_json.clone())).await.unwrap();
+                                            }
+                                        },
+                                        None => {}
+                                    }
+                                },
+                                None => {}
+                            }
+                        }
                         Ok(WebSocketMessage::time_update(time_update)) => {
                             let mut game_states = games.lock().await;
                             if let Some(game_state) = game_states.get_mut(&game_id) {
