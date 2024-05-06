@@ -1,11 +1,14 @@
 
 use crate::board::*;
 use crate::transposition::*;
-
+use std::fs::File;
+use std::io::{self, BufRead};
+use rand::seq::SliceRandom;  // Import SliceRandom for random choice
+use rand::thread_rng;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use std::fs;
 use anyhow::{Result, Context};
+use std::iter::Iterator; // Import the Iterator trait
 
 //Piece Square tables
 fn flip_index(index: usize) -> usize {
@@ -281,7 +284,8 @@ const WHITE_EG_KING_TABLE: [i32; 64] = [
   4988, 5017, 5014, 5017, 5017, 5038, 5023, 5011,
   4926, 4965, 4982, 4982, 4989, 5015, 5004, 4983,
 ];
-
+type Move = (u8, u8);  // Define the move type as a tuple of indices
+type GameSequence = Vec<Move>;
 //File utility functions from https://www.chessprogramming.org/Pawn_Fills
 pub fn north_fill(pawns: u64) -> u64 {
   let mut pawns = pawns;
@@ -297,12 +301,38 @@ pub struct Evaluation {
   pub upper_match: u64,
   pub lower_match: u64, 
   pub raw_match: u64,
+  pub game_sequences: Vec<GameSequence>,
+  pub outOfOpening: bool,
   // pub opening_book: HashMap<String, Vec<String>>,
 }
+fn load_game_sequences(file_path: &str) -> io::Result<Vec<GameSequence>> {
+  let file = File::open(file_path)?;
+  let reader = io::BufReader::new(file);
+  let mut sequences = Vec::new();
 
+  for line in reader.lines() {
+      let line = line?;
+      let moves = parse_moves(&line);
+      sequences.push(moves);
+  }
+  Ok(sequences)
+}
+
+fn parse_moves(line: &str) -> GameSequence {
+  line.split_whitespace()
+      .map(|s| {
+          let s = s.trim_matches(|p| p == '(' || p == ')');
+          let mut parts = s.split(',');
+          let from = parts.next().unwrap().parse::<u8>().unwrap();
+          let to = parts.next().unwrap().parse::<u8>().unwrap();
+          (from, to)
+      })
+      .collect()
+}
 
 impl Evaluation{
   pub fn new() -> Self {
+    let game_sequences = load_game_sequences("/usr/src/blue_brilliant/src/converted_games.txt").unwrap();
     Evaluation {
         transposition_table: TranspositionTable::new(100000000),
         zobrist_keys: Zobrist::new(),
@@ -310,10 +340,35 @@ impl Evaluation{
         upper_match: 0,
         lower_match: 0,
         raw_match: 0,
+        game_sequences,
+        outOfOpening: false,
     }
   }
 
   pub fn iterative_deepening_ab_pruning(&mut self, board: &mut Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), max_depth: u32, maximizing_player: bool) -> (i32, (u8, u8), u32) {
+    if !self.outOfOpening {
+      if board.move_history.is_empty() {
+          // Pick a random game sequence if the move history is empty
+          let mut rng = thread_rng();
+          if let Some(sequence) = self.game_sequences.choose(&mut rng) {
+              if !sequence.is_empty() {
+                  return (0, sequence[0], 0);
+              }
+          }
+      }
+
+      let current_history = &board.move_history;
+      let mut rng = thread_rng();
+      let possible_continuations: Vec<&GameSequence> = self.game_sequences.iter()
+          .filter(|&sequence| sequence.starts_with(current_history) && sequence.len() > current_history.len())
+          .collect();
+
+      if let Some(sequence) = possible_continuations.choose(&mut rng) {
+          return (0, sequence[current_history.len()], 0);
+      }
+    }
+
+    self.outOfOpening = true;
     let mut best_move = mve;
     let mut best_score = if maximizing_player { i32::MIN } else { i32::MAX };
     let mut total_node_count = 0;
@@ -651,11 +706,11 @@ pub fn evaluate_board(board: & mut Board, move_count: i32) -> i32 {
 
   score += rook_on_open_file(board);
   score += rook_on_semi_open_file(board);
-  score += move_count*MOBILITY;
-  let mut test_board = board.clone();
-  test_board.flip_move();
-  let test_moves = generate_legal_moves(&test_board);
-  score -= test_moves.len() as i32 * MOBILITY;
+  // score += move_count*MOBILITY;
+  // let mut test_board = board.clone();
+  // test_board.flip_move();
+  // let test_moves = generate_legal_moves(&test_board);
+  // score -= test_moves.len() as i32 * MOBILITY;
   score
 }
 

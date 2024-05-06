@@ -527,16 +527,15 @@ fn assign_player_colors() -> (bool, bool) {
 async fn create_engine_game(player_id: String) -> Json<GameState> {
     let id = generate_unique_id();
     let mut new_board = board::create_board();
-    let fen = "8/8/8/8/8/3k4/7q/3K4 w - - 0 1";
-    board::load_fen(&mut new_board, fen);
+    let (player1_color, player2_color) = assign_player_colors();
     let gameState = GameState{
         message_type: "GameState".to_string(),
         board: new_board.clone(),
         game_id: id.clone(),
         player1_id: player_id.clone(),
         player2_id: "engine".to_string(),
-        player1_color: true,
-        player2_color: false,
+        player1_color: player1_color,
+        player2_color: player2_color,
         turn: new_board.is_white_move(),
         board_array: board::board_enc(&new_board.clone()),
         player1_time: 600,
@@ -572,11 +571,11 @@ async fn engine_move(map: &mut MutexGuard<'_, HashMap<String, GameState>>, id: S
     let current_board = get_board(map, id.clone());
     let mut maximizer = false;
     let mut board = current_board.unwrap();
-    // if board.is_white_move() {
-    //     maximizer = true;
-    // } else {
-    //     maximizer = false;
-    // }
+    if board.is_white_move() {
+        maximizer = true;
+    } else {
+        maximizer = false;
+    }
     board::print_board(&board);
     let depth = 15;
     let mut best_move = (0,0);
@@ -681,7 +680,7 @@ fn generate_unique_id()-> String{
 async fn main() {
     // AllowedOrigins is a list of origins that are allowed to make requests
     // You can also specify particular origins like so:
-    let allowed_origins = AllowedOrigins::some_exact(&["http://localhost:4000", "http://localhost:8080", "https://localhost", "https://159.203.107.176"]);
+    let allowed_origins = AllowedOrigins::some_exact(&["http://localhost:4000", "http://localhost:8080", "https://localhost", "http://159.203.107.176", "http://bluebrilliant.me"]);
 
     let cors = CorsOptions { // Create a CorsOptions instance
         allowed_origins,

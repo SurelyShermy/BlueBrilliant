@@ -121,7 +121,7 @@ pub struct Board {
     black_castle_short: bool,
     is_white_move: bool,
     position_counts: HashMap<u64, u32>,
-    move_history: Vec<String>,
+    pub move_history: Vec<(u8, u8)>,
 }
 
 impl Board {
@@ -188,9 +188,7 @@ impl Board {
     pub fn position_counts(&mut self) -> &mut HashMap<u64, u32> {
         &mut self.position_counts
     }
-    pub fn move_history(&mut self) -> &mut Vec<String> {
-        &mut self.move_history
-    }
+
     pub fn flip_move(&mut self) {
         self.is_white_move = !self.is_white_move;
     }
@@ -481,14 +479,9 @@ pub fn is_promotion(board: &Board, start: u8) -> bool {
 }
 //Takes a board and does a move on that board
 pub fn make_move(board: &mut Board, start: u8, end: u8) {
+    board.move_history.push((start, end));
     if board.is_white_move {
         
-        if start >=64 {
-            println!("something has gone wrong");
-            println!("start: {}", start);
-            println!("end: {}", end);
-            print_board(&board);
-        }
         if 1<<start & board.white & board.pawns & SEVENTH_RANK != 0{
             //promotion
             capture_square(board, start);
@@ -566,12 +559,6 @@ pub fn make_move(board: &mut Board, start: u8, end: u8) {
             capture_square(board, start);
             let mut index = 0;
             if end & DIRECTION_MASK == PROMOTE_RIGHT {
-                if(start <= 8){
-                    println!("something has gone wrong");
-                    println!("start: {}", start);
-                    println!("end: {}", end);
-                    print_board(&board);
-                }
                 index = start-9;
                 capture_square(board, index);
             } else if end & DIRECTION_MASK == PROMOTE_LEFT {
