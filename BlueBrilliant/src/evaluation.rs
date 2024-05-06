@@ -2,8 +2,10 @@
 use crate::board::*;
 use crate::transposition::*;
 
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
-
+use std::fs;
+use anyhow::{Result, Context};
 
 //Piece Square tables
 fn flip_index(index: usize) -> usize {
@@ -16,7 +18,7 @@ const MG_BISHOP_VALUE: i32 = 365;
 const MG_ROOK_VALUE: i32 = 477;
 const MG_QUEEN_VALUE: i32 = 1025;
 const MG_KING_VALUE: i32 = 5000;
-
+const MOBILITY: i32 = 5;
 const EG_PAWN_VALUE: i32 = 94;
 const EG_KNIGHT_VALUE: i32 = 281;
 const EG_BISHOP_VALUE: i32 = 297;
@@ -295,7 +297,7 @@ pub struct Evaluation {
   pub upper_match: u64,
   pub lower_match: u64, 
   pub raw_match: u64,
-  pub pv_table: Vec<Vec<(u8, u8)>>
+  // pub opening_book: HashMap<String, Vec<String>>,
 }
 
 
@@ -308,28 +310,13 @@ impl Evaluation{
         upper_match: 0,
         lower_match: 0,
         raw_match: 0,
-        pv_table: vec![vec![]; 64]
-    }
-  }
-  pub fn add_move(&mut self, ply: usize, move_: (u8, u8)) {
-    if ply < self.pv_table.len() {
-        self.pv_table[ply].push(move_);
-    } else {
-        // Handle the error or extend the table
-        println!("Ply out of range");
     }
   }
 
-  // Retrieve moves for a specific ply
-  pub fn get_moves_for_ply(&self, ply: usize) -> Option<&[(u8, u8)]> {
-      self.pv_table.get(ply).map(|moves| moves.as_slice())
-  }
   pub fn iterative_deepening_ab_pruning(&mut self, board: &mut Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), max_depth: u32, maximizing_player: bool) -> (i32, (u8, u8), u32) {
     let mut best_move = mve;
     let mut best_score = if maximizing_player { i32::MIN } else { i32::MAX };
     let mut total_node_count = 0;
-    println!("Sanity Check starting eval before loop {}", evaluate_board(board));
-    println!("max depth: {}", max_depth);
     let start = Instant::now();
     for depth in 1..=max_depth {
         if(start.elapsed().as_secs() > 30){
@@ -338,6 +325,10 @@ impl Evaluation{
         }
         println!("Depth: {}", depth);
         let (score, move_at_depth, node_count) = self.ab_pruning(board, initial_alpha, initial_beta, best_move, depth, maximizing_player, start, max_depth, 0);
+        if(start.elapsed().as_secs() > 30){
+          print!("Final depth was {}\n", depth);
+          return (best_score, best_move, total_node_count);
+        }
         total_node_count += node_count;
         best_move = move_at_depth;
         best_score = score;
@@ -348,68 +339,68 @@ impl Evaluation{
     }
     (best_score, best_move, total_node_count)
   }
-  fn quiescence_search(&mut self, board: &mut Board, alpha: i32, beta: i32, node_count: &mut u32, depth: u32) -> i32 {
-    *node_count += 1;
-    let mut alpha = alpha;
-    let stand_pat = evaluate_board(board);
-    if depth == MAX_QUIESCENCE_DEPTH {
-      return stand_pat;
-    }
-    if stand_pat >= beta {
-        return beta;
-    }
-    if alpha < stand_pat {
-        alpha = stand_pat;
-    }
+//   fn quiescence_search(&mut self, board: &mut Board, alpha: i32, beta: i32, node_count: &mut u32, depth: u32) -> i32 {
+//     *node_count += 1;
+//     let mut alpha = alpha;
+//     let stand_pat = evaluate_board(board);
+//     if depth == MAX_QUIESCENCE_DEPTH {
+//       return stand_pat;
+//     }
+//     if stand_pat >= beta {
+//         return beta;
+//     }
+//     if alpha < stand_pat {
+//         alpha = stand_pat;
+//     }
     
 
-    let capture_moves = capture_moves_only(board);
-    for i in (0..capture_moves.len()).step_by(2) {
-        if is_promotion(board, capture_moves[i]){
-          if board.is_white_move(){
-            let direction = (capture_moves[i+1]-capture_moves[i]-7)<<6;
-            for j in 0..4{
-              let end = direction | j<<4;
-              let mut new_board: Board = simulate_move(board, capture_moves[i], end);
+//     let capture_moves = capture_moves_only(board);
+//     for i in (0..capture_moves.len()).step_by(2) {
+//         if is_promotion(board, capture_moves[i]){
+//           if board.is_white_move(){
+//             let direction = (capture_moves[i+1]-capture_moves[i]-7)<<6;
+//             for j in 0..4{
+//               let end = direction | j<<4;
+//               let mut new_board: Board = simulate_move(board, capture_moves[i], end);
 
-              let score = -self.quiescence_search(&mut new_board, -beta, -alpha, node_count, depth+1);
-              if score >= beta {
-                return beta;
-              }
-              if score > alpha {
-                  alpha = score;
-              }
-            }
-          }
-          else{
-            let direction = ((capture_moves[i+1]+9)-capture_moves[i])<<6;
-            for j in 0..4{
-              let end = direction | j<<4;
-              let mut new_board: Board = simulate_move(board, capture_moves[i], end);
-              let score = -self.quiescence_search(&mut new_board, -beta, -alpha, node_count, depth+1);
-              if score >= beta {
-                return beta;
-              }
-              if score > alpha {
-                  alpha = score;
-              }
-            }
-          }
-        }
-        else{
-          let mut new_board: Board = simulate_move(board, capture_moves[i], capture_moves[i + 1]);
-          let score = -self.quiescence_search(&mut new_board, -beta, -alpha, node_count, depth+1);
-          if score >= beta {
-            return beta;
-          }
-          if score > alpha {
-              alpha = score;
-          }
-        }
-    }
+//               let score = -self.quiescence_search(&mut new_board, -beta, -alpha, node_count, depth+1);
+//               if score >= beta {
+//                 return beta;
+//               }
+//               if score > alpha {
+//                   alpha = score;
+//               }
+//             }
+//           }
+//           else{
+//             let direction = ((capture_moves[i+1]+9)-capture_moves[i])<<6;
+//             for j in 0..4{
+//               let end = direction | j<<4;
+//               let mut new_board: Board = simulate_move(board, capture_moves[i], end);
+//               let score = -self.quiescence_search(&mut new_board, -beta, -alpha, node_count, depth+1);
+//               if score >= beta {
+//                 return beta;
+//               }
+//               if score > alpha {
+//                   alpha = score;
+//               }
+//             }
+//           }
+//         }
+//         else{
+//           let mut new_board: Board = simulate_move(board, capture_moves[i], capture_moves[i + 1]);
+//           let score = -self.quiescence_search(&mut new_board, -beta, -alpha, node_count, depth+1);
+//           if score >= beta {
+//             return beta;
+//           }
+//           if score > alpha {
+//               alpha = score;
+//           }
+//         }
+//     }
 
-    alpha
-}
+//     alpha
+// }
   pub fn ab_pruning(&mut self, board: &mut Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), depth: u32, maximizing_player: bool, time: Instant, max_depth: u32, ply: u32) -> (i32, (u8, u8), u32) {
     let mut node_count = 1;
     
@@ -464,47 +455,47 @@ impl Evaluation{
         self.transposition_table.store(new_entry);
       }
     }
-    // if(time.elapsed().as_secs() > 30){
-    //   let eval = evaluate_board(board);
-    //   let node_type = if eval <= initial_alpha {
-    //       LOWERBOUND
-    //   } else if eval >= initial_beta {
-    //       UPPERBOUND
-    //   } else {
-    //       EXACT
-    //   };
-    //   self.transposition_table.replace(hash, depth, Some(mve), eval, node_type, false);
-    //   if mve == NULL_MOVE{
-    //     println!("this is a bad return in time elasped");
-    //   }
-    //   return (eval, mve, node_count);
-    // }
-    if depth == 0 {
-      let eval = evaluate_board(board);
+    
+    let moves: Vec<u8> = ab_move_generation(board);
+    let move_count = moves.len() as i32;
+    if(time.elapsed().as_secs() > 30){
+      let eval = evaluate_board(board, move_count);
+      let node_type = if eval <= initial_alpha {
+          LOWERBOUND
+      } else if eval >= initial_beta {
+          UPPERBOUND
+      } else {
+          EXACT
+      };
+      self.transposition_table.replace(hash, depth, Some(mve), eval, node_type, false);
+      if mve == NULL_MOVE{
+        println!("this is a bad return in time elasped");
+      }
       return (eval, mve, node_count);
     }
-    let moves = ab_move_generation(board);
-    if moves.len() == 0 {
+    if move_count == 0 {
         if is_check(board) {
             if maximizing_player {
                 //Should node type here be exact??
-                self.transposition_table.replace(hash, depth, Some(mve), i32::MAX - depth as i32, LOWERBOUND, false);
+                // self.transposition_table.replace(hash, depth, Some(mve), i32::MAX - depth as i32, LOWERBOUND, false);
                 // let new_entry = TableEntry::new(self.zobrist_keys.compute_hash(board), depth, Some(mve), i32::MIN + depth as i32, LOWERBOUND, false);
-                return (i32::MIN + depth as i32, mve, node_count);
+                return (i32::MIN as i32, mve, node_count);
             } else {
-                self.transposition_table.replace(hash, depth, Some(mve), i32::MIN + depth as i32, UPPERBOUND, false);
+                // self.transposition_table.replace(hash, depth, Some(mve), i32::MIN + depth as i32, UPPERBOUND, false);
                 // let new_entry = TableEntry::new(self.zobrist_keys.compute_hash(board), depth, Some(mve), i32::MAX - depth as i32, UPPERBOUND, false);
-                return (i32::MAX - depth as i32, mve, node_count);
+                return (i32::MAX as i32, mve, node_count);
             }
         } else {
             return (0, mve, node_count);
         }
     }
-    
+    if depth == 0 {
+      let eval = evaluate_board(board, move_count);
+      return (eval, mve, node_count);
+    }
     let mut best_move = mve;
     if maximizing_player {
         let mut value = i32::MIN;
-  
         for i in (0..moves.len()).step_by(2) {
             if (moves[i], moves[i+1]) == NULL_MOVE{
               println!("this is a move gen error");
@@ -622,6 +613,7 @@ impl Evaluation{
             *new_board.position_counts().entry(hash).or_insert(0)+=1;
             let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, true, time, max_depth, ply+1);
             node_count += child_node_count;
+          
             if score < value {
                 value = score;
                 best_move = (moves[i], moves[i + 1]);
@@ -647,53 +639,26 @@ impl Evaluation{
     }
   } 
 }
-pub fn evaluate_board(board: & mut Board) -> i32 {
+pub fn evaluate_board(board: & mut Board, move_count: i32) -> i32 {
   let mut score: i32 = 0;
   let mut egPhase: i32 = 0;
   //Perhaps calculate material can also pass the eg phase to allow for phase tapering
 
   [score, egPhase] = calculate_material(board);
-  // score += calculate_pawn_structure(board, egPhase);
+  score += calculate_pawn_structure(board, egPhase);
   // score += calculate_king_safety(board);
-  // score += calculate_bishop_pair(board);
+  score += calculate_bishop_pair(board);
 
-  // score += rook_on_open_file(board);
-  // score += rook_on_semi_open_file(board);
-
+  score += rook_on_open_file(board);
+  score += rook_on_semi_open_file(board);
+  score += move_count*MOBILITY;
+  let mut test_board = board.clone();
+  test_board.flip_move();
+  let test_moves = generate_legal_moves(&test_board);
+  score -= test_moves.len() as i32 * MOBILITY;
   score
 }
-pub fn south_fill(pawns: u64)-> u64 {
-  let mut pawns = pawns;
-  pawns |= pawns >> 8;
-  pawns |= pawns >> 16;
-  pawns |= pawns >> 32;
-  pawns
-}
 
-pub fn white_front_span(wpawns: u64)-> u64{
-  nort(north_fill(wpawns))
-}
-
-pub fn black_rear_span(bpawns: u64)-> u64{
-  nort(north_fill(bpawns))
-}
-
-pub fn black_front_span(bpawns: u64)-> u64{
-  sout(south_fill(bpawns))
-}
-
-pub fn white_rear_span(wpawns: u64)-> u64{
-  sout(south_fill(wpawns))
-}
-pub fn file_fill(pawns: u64) -> u64 {
-  north_fill(pawns) | south_fill(pawns)
-}
-pub fn w_pawns_behind(wpawns: u64) -> u64 {
-  wpawns & white_rear_span(wpawns)
-}
-pub fn w_pawns_front(wpawns: u64) -> u64 {
-  wpawns & white_front_span(wpawns)
-}
 //These are setwise, they simply count the number of passed pawns
 pub fn w_passed_pawn_count(wpawns: u64, bpawns: u64)->i32{
   let mut all_front_spans = black_front_span(bpawns);
@@ -865,12 +830,10 @@ pub fn rook_on_open_file(board: &Board) -> i32 {
   let mut wrooks_on_open_file = wrooks & !file_fill(board.pawns());
   let mut brooks_on_open_file = brooks & !file_fill(board.pawns());
   while wrooks_on_open_file != 0 {
-    let index = wrooks_on_open_file.trailing_zeros() as usize;
     score += ROOK_OPEN_FILE;
     wrooks_on_open_file &= wrooks_on_open_file - 1;
   }
   while brooks_on_open_file != 0 {
-    let index = brooks_on_open_file.trailing_zeros() as usize;
     score -= ROOK_OPEN_FILE;
     brooks_on_open_file &= brooks_on_open_file - 1;
   }
@@ -884,7 +847,6 @@ pub fn rook_on_semi_open_file(board: &Board) -> i32 {
   let mut wrooks_on_semi_open_file = wrooks & file_fill(board.pawns()) & !board.pawns();
   let mut brooks_on_semi_open_file = brooks & file_fill(board.pawns()) & !board.pawns();
   while wrooks_on_semi_open_file != 0 {
-    let index = wrooks_on_semi_open_file.trailing_zeros() as usize;
     score += ROOK_SEMI_FILE;
     wrooks_on_semi_open_file &= wrooks_on_semi_open_file - 1;
   }
@@ -894,4 +856,36 @@ pub fn rook_on_semi_open_file(board: &Board) -> i32 {
     brooks_on_semi_open_file &= brooks_on_semi_open_file - 1;
   }
   score
+}
+pub fn south_fill(pawns: u64)-> u64 {
+  let mut pawns = pawns;
+  pawns |= pawns >> 8;
+  pawns |= pawns >> 16;
+  pawns |= pawns >> 32;
+  pawns
+}
+
+pub fn white_front_span(wpawns: u64)-> u64{
+  nort(north_fill(wpawns))
+}
+
+pub fn black_rear_span(bpawns: u64)-> u64{
+  nort(north_fill(bpawns))
+}
+
+pub fn black_front_span(bpawns: u64)-> u64{
+  sout(south_fill(bpawns))
+}
+
+pub fn white_rear_span(wpawns: u64)-> u64{
+  sout(south_fill(wpawns))
+}
+pub fn file_fill(pawns: u64) -> u64 {
+  north_fill(pawns) | south_fill(pawns)
+}
+pub fn w_pawns_behind(wpawns: u64) -> u64 {
+  wpawns & white_rear_span(wpawns)
+}
+pub fn w_pawns_front(wpawns: u64) -> u64 {
+  wpawns & white_front_span(wpawns)
 }

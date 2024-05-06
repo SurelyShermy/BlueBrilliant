@@ -40,14 +40,19 @@ enum WebSocketMessage {
     resign_request(resign_request),
     time_update(time_update),
     rematch_request(rematch_request),
+    rematch_confirmed(rematch_confirmed),
 }
 #[derive(Serialize, Deserialize)]
 struct resign_request{
     game_id: String,
     player: String,
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct rematch_request{
+    message_type: String,
+}
+#[derive(Serialize, Deserialize)]
+struct rematch_confirmed{
     game_id: String,
 }
 #[derive(Serialize, Deserialize)]
@@ -261,6 +266,12 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                                         }else{
                                             game_result = format!("{} wins", game_state.player1_id.clone());
                                         }
+                                    }else if game_result == "White wins"{
+                                        if game_state.player1_color{
+                                            game_result = format!("{} wins", game_state.player1_id.clone());
+                                        }else{
+                                            game_result = format!("{} wins", game_state.player2_id.clone());
+                                        }
                                     }
                                     let game_over_response = gameOver_response{
                                         message_type: "gameOver_response".to_string(),
@@ -325,8 +336,25 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                             eprintln!("Error parsing message: {:?}", e);
                         },
                         Ok(WebSocketMessage::rematch_request(rematch_request)) =>{
+                            let mut mutex = owned_game_channel.lock().await;
+                            let sinks_mutex = mutex.get_mut(&game_id);
+                            let rematch_response = rematch_request{
+                                message_type: "rematch_request".to_string(),
+                            };
+                            let rematch_response_json = serde_json::to_string(&rematch_response).expect("Failed to serialize rematch request");
+                            match sinks_mutex{
+                                Some(sinks) => {
+                                    for sink in sinks.iter_mut(){
+                                        sink.send(ws::Message::Text(rematch_response_json.clone())).await.unwrap();
+                                    }
+                                },
+                                None => {}
+                            }
+
+                        }
+                        Ok(WebSocketMessage::rematch_confirmed(rematch_confirmed)) => {
                             let mut map = games.lock().await;
-                            let game_state_option = map.get_mut(&rematch_request.game_id);
+                            let game_state_option = map.get_mut(&rematch_confirmed.game_id);
                             match game_state_option{
                                 Some(game_state) => {
                                     game_state.board = board::create_board();
@@ -349,17 +377,19 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                                 },
                                 None => {}
                             }
-                        }
+                        },
                         Ok(WebSocketMessage::time_update(time_update)) => {
                             let mut game_states = games.lock().await;
+                            let mut result = "".to_string();
                             if let Some(game_state) = game_states.get_mut(&game_id) {
                                 if game_state.turn {
                                     game_state.player1_time -= 1;
                                     if game_state.player1_time == 0 {
+                                        result = format!("{} wins on time", game_state.player2_id.clone());
                                         game_state.game_over = true;
                                         let game_over_response = gameOver_response{
                                             message_type: "gameOver_response".to_string(),
-                                            result: "Player 2 wins on time".to_string(),
+                                            result: result.clone(),
                                         };
                                         let game_over_response_json = serde_json::to_string(&game_over_response).expect("Failed to serialize game over response");
                                         let mut mutex = owned_game_channel.lock().await;
@@ -375,11 +405,13 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                                     }
                                 } else {
                                     game_state.player2_time -= 1;
-                                    if game_state.player1_time == 0 {
+                                    if game_state.player2_time == 0 {
                                         game_state.game_over = true;
+                                        result = format!("{} wins on time", game_state.player1_id.clone());
+
                                         let game_over_response = gameOver_response{
                                             message_type: "gameOver_response".to_string(),
-                                            result: "Player 1 wins on time".to_string(),
+                                            result: result.clone(),
                                         };
                                         let game_over_response_json = serde_json::to_string(&game_over_response).expect("Failed to serialize game over response");
                                         let mut mutex = owned_game_channel.lock().await;
@@ -495,6 +527,8 @@ fn assign_player_colors() -> (bool, bool) {
 async fn create_engine_game(player_id: String) -> Json<GameState> {
     let id = generate_unique_id();
     let mut new_board = board::create_board();
+    let fen = "8/8/8/8/8/3k4/7q/3K4 w - - 0 1";
+    board::load_fen(&mut new_board, fen);
     let gameState = GameState{
         message_type: "GameState".to_string(),
         board: new_board.clone(),

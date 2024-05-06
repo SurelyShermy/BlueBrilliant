@@ -121,6 +121,7 @@ pub struct Board {
     black_castle_short: bool,
     is_white_move: bool,
     position_counts: HashMap<u64, u32>,
+    move_history: Vec<String>,
 }
 
 impl Board {
@@ -187,6 +188,12 @@ impl Board {
     pub fn position_counts(&mut self) -> &mut HashMap<u64, u32> {
         &mut self.position_counts
     }
+    pub fn move_history(&mut self) -> &mut Vec<String> {
+        &mut self.move_history
+    }
+    pub fn flip_move(&mut self) {
+        self.is_white_move = !self.is_white_move;
+    }
 }
 
 pub fn create_board() -> Board {
@@ -205,6 +212,7 @@ pub fn create_board() -> Board {
         black_castle_short: true,
         is_white_move: true,
         position_counts: HashMap::new(),
+        move_history: Vec::new(),
     }
 }
 pub fn can_claim_draw(board: &Board, hash: u64) -> bool {
@@ -261,6 +269,20 @@ pub fn game_over_check(board: &Board) -> String {
         }
     }
     return "False".to_string();
+}
+pub fn game_over_AB(board: &mut Board) -> u8 {
+    board.flip_move();
+    let moves: Vec<u8> = generate_legal_moves(board);
+    if moves.len() == 0{
+        if is_check(board){
+            board.flip_move();
+            return 1;
+        } else {
+            board.flip_move();
+            return 2;
+        }
+    }
+    return 0;
 }
 fn valid_board(old_board: &Board, start: u8, end: u8) -> Option<Board> {
     let mut board: Board = simulate_move(old_board, start, end); 
