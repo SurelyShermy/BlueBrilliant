@@ -250,7 +250,7 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                             let game_state = map.get_mut(&gameOver_request.game_id);
                             match game_state{
                                 Some(game_state) => {
-                                    let mut game_result: String = game_over_check(&game_state.board.clone());
+                                    let mut game_result: String = game_over_check(&mut game_state.board.clone());
                                     if game_result == "False"{
                                         if game_state.player1_time == 0 || game_state.player2_time == 0{
                                             if game_state.player1_time == 0{
@@ -528,6 +528,10 @@ async fn create_engine_game(player_id: String) -> Json<GameState> {
     let id = generate_unique_id();
     let mut new_board = board::create_board();
     let (player1_color, player2_color) = assign_player_colors();
+    // let player1_color = true;
+    // let player2_color = false;
+    // let fen = "8/8/8/8/8/3k4/7q/3K4 b - - 0 1";
+    // board::load_fen(&mut new_board, fen);
     let gameState = GameState{
         message_type: "GameState".to_string(),
         board: new_board.clone(),

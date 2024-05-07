@@ -253,7 +253,7 @@ pub fn print_move_trees(board: &Board, depth: u8){
 *   king is in check at end of move
 *   king is in check at start of a castle
 */ 
-pub fn game_over_check(board: &Board) -> String {
+pub fn game_over_check(board: &mut Board) -> String {
     let moves: Vec<u8> = generate_legal_moves(board);
     if moves.len() == 0{
         if is_check(board){
@@ -268,20 +268,20 @@ pub fn game_over_check(board: &Board) -> String {
     }
     return "False".to_string();
 }
-pub fn game_over_AB(board: &mut Board) -> u8 {
-    board.flip_move();
-    let moves: Vec<u8> = generate_legal_moves(board);
-    if moves.len() == 0{
-        if is_check(board){
-            board.flip_move();
-            return 1;
-        } else {
-            board.flip_move();
-            return 2;
-        }
-    }
-    return 0;
-}
+// pub fn game_over_AB(board: &mut Board) -> u8 {
+//     board.flip_move();
+//     let moves: Vec<u8> = generate_legal_moves(board);
+//     if moves.len() == 0{
+//         if is_check(board){
+//             board.flip_move();
+//             return 1;
+//         } else {
+//             board.flip_move();
+//             return 2;
+//         }
+//     }
+//     return 0;
+// }
 fn valid_board(old_board: &Board, start: u8, end: u8) -> Option<Board> {
     let mut board: Board = simulate_move(old_board, start, end); 
     let attacks: u64 = generate_attacks(&board); 
@@ -698,7 +698,7 @@ pub fn capture_moves_only(board: &Board) -> Vec<u8> {
     }
     captures
 }
-pub fn ab_move_generation(board: &Board) -> Vec<u8> {
+pub fn ab_move_generation(board: &mut Board) -> Vec<u8> {
     let moves: Vec<u8> = generate_legal_moves(board);
     let mut quiet_moves: Vec<u8> = Vec::new();
     let mut checks: Vec<u8> = Vec::new();
@@ -706,9 +706,9 @@ pub fn ab_move_generation(board: &Board) -> Vec<u8> {
     let mut captures_only: Vec<u8> = Vec::new();
     let mut ab_moves: Vec<u8> = Vec::new();
     for i in (0..moves.len()).step_by(2) { 
-        let sim_board = simulate_move(board, moves[i], moves[i+1]);
+        let mut sim_board = simulate_move(board, moves[i], moves[i+1]);
         let capture = is_capture(board, moves[i+1]);
-        let check = is_check(&sim_board);
+        let check = is_check(&mut sim_board);
         //If its a check and a capture
         if check{
             if capture {
@@ -741,8 +741,10 @@ pub fn ab_move_generation(board: &Board) -> Vec<u8> {
     ab_moves
 }
 
-pub fn is_check(board: &Board) -> bool {
+pub fn is_check(board: &mut Board) -> bool {
+    board.is_white_move = !board.is_white_move;
     let mut attacks: u64 = generate_attacks(board);
+    board.is_white_move = !board.is_white_move;
     let king: u8 = king_position(board);
     attacks &= 1<<king;
     return attacks != 0;

@@ -380,6 +380,9 @@ impl Evaluation{
         }
         println!("Depth: {}", depth);
         let (score, move_at_depth, node_count) = self.ab_pruning(board, initial_alpha, initial_beta, best_move, depth, maximizing_player, start, max_depth, 0);
+        if score == i32::MIN || score == i32::MAX {
+            return (score, move_at_depth, node_count);
+        }
         if(start.elapsed().as_secs() > 30){
           print!("Final depth was {}\n", depth);
           return (best_score, best_move, total_node_count);
@@ -475,9 +478,6 @@ impl Evaluation{
         if x.depth() as u32 >= (depth) && x.depth() as u32 >= 4  && x.is_dummy() == false{
           if x.node_type() == EXACT {
             self.exact_match += 1;
-            if x.best_move().unwrap() == NULL_MOVE{
-              println!("this is a bad return in exact");
-            }
             return (x.score(), x.best_move().unwrap(), node_count);
           } else if x.node_type() == LOWERBOUND {
             self.lower_match += 1;
@@ -488,16 +488,10 @@ impl Evaluation{
           }
           if maximizing_player{
             if alpha >= beta {
-              if x.best_move().unwrap() == NULL_MOVE{
-                println!("this is a bad return in ab cut off");
-              }
               return (x.score(), x.best_move().unwrap(), node_count);
             }
           }else{
             if beta <= alpha {
-              if x.best_move().unwrap() == NULL_MOVE{
-                println!("this is a bad return in ab cut off");
-              }
               return (x.score(), x.best_move().unwrap(), node_count);
             }
           }
@@ -511,7 +505,7 @@ impl Evaluation{
       }
     }
     
-    let moves: Vec<u8> = ab_move_generation(board);
+    let moves: Vec<u8> = generate_legal_moves(board);
     let move_count = moves.len() as i32;
     if(time.elapsed().as_secs() > 30){
       let eval = evaluate_board(board, move_count);
@@ -531,14 +525,12 @@ impl Evaluation{
     if move_count == 0 {
         if is_check(board) {
             if maximizing_player {
-                //Should node type here be exact??
-                // self.transposition_table.replace(hash, depth, Some(mve), i32::MAX - depth as i32, LOWERBOUND, false);
-                // let new_entry = TableEntry::new(self.zobrist_keys.compute_hash(board), depth, Some(mve), i32::MIN + depth as i32, LOWERBOUND, false);
-                return (i32::MIN as i32, mve, node_count);
+                //if its checkmate on maximizing turn then youre losing
+                return (i32::MIN, mve, node_count);
             } else {
-                // self.transposition_table.replace(hash, depth, Some(mve), i32::MIN + depth as i32, UPPERBOUND, false);
-                // let new_entry = TableEntry::new(self.zobrist_keys.compute_hash(board), depth, Some(mve), i32::MAX - depth as i32, UPPERBOUND, false);
-                return (i32::MAX as i32, mve, node_count);
+                //if its checkmate on minimum turn then youre losing
+
+                return (i32::MAX, mve, node_count);
             }
         } else {
             return (0, mve, node_count);
@@ -564,6 +556,11 @@ impl Evaluation{
                   *new_board.position_counts().entry(hash).or_insert(0)+=1;
                   let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, false, time, max_depth, ply+1);
                   node_count += child_node_count;
+                  // if score == i32::MAX{
+                  //   value = score;
+                  //   best_move = (moves[i], moves[i + 1]);
+                  //   break;
+                  // }
                   if score > value {
                       value = score;
                       best_move = (moves[i], end);
@@ -582,6 +579,11 @@ impl Evaluation{
                   *new_board.position_counts().entry(hash).or_insert(0)+=1;
                   let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, false, time, max_depth, ply+1);
                   node_count += child_node_count;
+                  // if score == i32::MAX{
+                  //   value = score;
+                  //   best_move = (moves[i], moves[i + 1]);
+                  //   break;
+                  // }
                   if score > value {
                       value = score;
                       best_move = (moves[i], end);
@@ -598,6 +600,11 @@ impl Evaluation{
               *new_board.position_counts().entry(hash).or_insert(0)+=1;
               let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, false, time, max_depth, ply+1);
               node_count += child_node_count;
+              // if score == i32::MAX{
+              //   value = score;
+              //   best_move = (moves[i], moves[i + 1]);
+              //   break;
+              // }
               if score > value {
                   value = score;
                   best_move = (moves[i], moves[i + 1]);
@@ -635,6 +642,11 @@ impl Evaluation{
                 *new_board.position_counts().entry(hash).or_insert(0)+=1;
                 let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, true, time, max_depth, ply+1);
                 node_count += child_node_count;
+                // if score == i32::MIN{
+                //   value = score;
+                //   best_move = (moves[i], moves[i + 1]);
+                //   break;
+                // }
                 if score < value {
                   value = score;
                   best_move = (moves[i], moves[i + 1]);
@@ -653,6 +665,11 @@ impl Evaluation{
                 *new_board.position_counts().entry(hash).or_insert(0)+=1;
                 let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, true, time, max_depth, ply+1);
                 node_count += child_node_count;
+                // if score == i32::MIN{
+                //   value = score;
+                //   best_move = (moves[i], moves[i + 1]);
+                //   break;
+                // }
                 if score < value {
                   value = score;
                   best_move = (moves[i], moves[i + 1]);
@@ -668,7 +685,11 @@ impl Evaluation{
             *new_board.position_counts().entry(hash).or_insert(0)+=1;
             let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, true, time, max_depth, ply+1);
             node_count += child_node_count;
-          
+            // if score == i32::MIN{
+            //   value = score;
+            //   best_move = (moves[i], moves[i + 1]);
+            //   break;
+            // }
             if score < value {
                 value = score;
                 best_move = (moves[i], moves[i + 1]);
