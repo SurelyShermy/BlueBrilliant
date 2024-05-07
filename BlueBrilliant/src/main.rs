@@ -623,7 +623,7 @@ async fn engine_move(gameState: &mut GameState, id: String, evaluator: &mut eval
     let mut eval = 0;
     let mut nodes_counted = 0;
     println!("Called iterative deepning");
-    (eval, best_move, nodes_counted) = evaluation::Evaluation::iterative_deepening_ab_pruning( evaluator, &mut board, i32::MIN, i32::MAX, (0,0), depth, maximizer);
+    (eval, best_move, nodes_counted) = evaluation::Evaluation::iterative_deepening_ab_pruning( evaluator, &mut board, i32::MIN, i32::MAX, (0,0), depth, maximizer).await;
     board::make_move(&mut board, best_move.0, best_move.1);
     board::print_board(&board);
     println!("{},{}", best_move.0, best_move.1);

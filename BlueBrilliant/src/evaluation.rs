@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use anyhow::{Result, Context};
 use std::iter::Iterator; // Import the Iterator trait
+use async_recursion::async_recursion;
 
 //Piece Square tables
 fn flip_index(index: usize) -> usize {
@@ -345,7 +346,7 @@ impl Evaluation{
     }
   }
 
-  pub fn iterative_deepening_ab_pruning(&mut self, board: &mut Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), max_depth: u32, maximizing_player: bool) -> (i32, (u8, u8), u32) {
+  pub async fn iterative_deepening_ab_pruning(&mut self, board: &mut Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), max_depth: u32, maximizing_player: bool) -> (i32, (u8, u8), u32) {
     if !self.outOfOpening {
       if board.move_history.is_empty() {
           // Pick a random game sequence if the move history is empty
@@ -379,7 +380,7 @@ impl Evaluation{
           return (best_score, best_move, total_node_count);
         }
         println!("Depth: {}", depth);
-        let (score, move_at_depth, node_count) = self.ab_pruning(board, initial_alpha, initial_beta, best_move, depth, maximizing_player, start, max_depth, 0);
+        let (score, move_at_depth, node_count) = self.ab_pruning(board, initial_alpha, initial_beta, best_move, depth, maximizing_player, start, max_depth, 0).await;
         if score == i32::MIN || score == i32::MAX {
             return (score, move_at_depth, node_count);
         }
@@ -459,7 +460,8 @@ impl Evaluation{
 
 //     alpha
 // }
-  pub fn ab_pruning(&mut self, board: &mut Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), depth: u32, maximizing_player: bool, time: Instant, max_depth: u32, ply: u32) -> (i32, (u8, u8), u32) {
+#[async_recursion]
+  pub async fn ab_pruning(&mut self, board: &mut Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), depth: u32, maximizing_player: bool, time: Instant, max_depth: u32, ply: u32) -> (i32, (u8, u8), u32) {
     let mut node_count = 1;
     
     let hash = self.zobrist_keys.compute_hash(board);
@@ -554,7 +556,7 @@ impl Evaluation{
                   let end = direction | j<<4;
                   let mut new_board: Board = simulate_move(board, moves[i], end);
                   *new_board.position_counts().entry(hash).or_insert(0)+=1;
-                  let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, false, time, max_depth, ply+1);
+                  let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, false, time, max_depth, ply+1).await;
                   node_count += child_node_count;
                   // if score == i32::MAX{
                   //   value = score;
@@ -577,7 +579,7 @@ impl Evaluation{
                   let end = direction | j<<4;
                   let mut new_board: Board = simulate_move(board, moves[i], end);
                   *new_board.position_counts().entry(hash).or_insert(0)+=1;
-                  let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, false, time, max_depth, ply+1);
+                  let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, false, time, max_depth, ply+1).await;
                   node_count += child_node_count;
                   // if score == i32::MAX{
                   //   value = score;
@@ -598,7 +600,7 @@ impl Evaluation{
             else{
               let mut new_board: Board = simulate_move(board, moves[i], moves[i + 1]);
               *new_board.position_counts().entry(hash).or_insert(0)+=1;
-              let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, false, time, max_depth, ply+1);
+              let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, false, time, max_depth, ply+1).await;
               node_count += child_node_count;
               // if score == i32::MAX{
               //   value = score;
@@ -640,7 +642,7 @@ impl Evaluation{
                 let end = direction | j<<4;
                 let mut new_board: Board = simulate_move(board, moves[i], end);
                 *new_board.position_counts().entry(hash).or_insert(0)+=1;
-                let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, true, time, max_depth, ply+1);
+                let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, true, time, max_depth, ply+1).await;
                 node_count += child_node_count;
                 // if score == i32::MIN{
                 //   value = score;
@@ -663,7 +665,7 @@ impl Evaluation{
                 let end = direction | j<<4;
                 let mut new_board: Board = simulate_move(board, moves[i], end);
                 *new_board.position_counts().entry(hash).or_insert(0)+=1;
-                let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, true, time, max_depth, ply+1);
+                let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], end), depth - 1, true, time, max_depth, ply+1).await;
                 node_count += child_node_count;
                 // if score == i32::MIN{
                 //   value = score;
@@ -683,7 +685,7 @@ impl Evaluation{
           }else{
             let mut new_board = simulate_move(board, moves[i], moves[i + 1]);
             *new_board.position_counts().entry(hash).or_insert(0)+=1;
-            let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, true, time, max_depth, ply+1);
+            let (score, _, child_node_count) = Self::ab_pruning(self, &mut new_board, alpha, beta, (moves[i], moves[i + 1]), depth - 1, true, time, max_depth, ply+1).await;
             node_count += child_node_count;
             // if score == i32::MIN{
             //   value = score;
