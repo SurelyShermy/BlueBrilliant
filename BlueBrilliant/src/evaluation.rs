@@ -295,6 +295,7 @@ pub fn north_fill(pawns: u64) -> u64 {
   pawns |= pawns << 32;
   pawns
 }
+
 pub struct Evaluation {
   transposition_table: TranspositionTable,
   zobrist_keys: Zobrist,

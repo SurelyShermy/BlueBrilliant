@@ -139,6 +139,7 @@ struct MessageType {
 
 lazy_static! {
     static ref GAMESTATES: Arc<Mutex<HashMap<String, Arc<Mutex<GameState>>>>> = Arc::new(Mutex::new(HashMap::new()));
+    static ref EVALUATORS: Arc<Mutex<HashMap<String, Arc<Mutex<Evaluation>>>>> = Arc::new(Mutex::new(HashMap::new()));
     static ref MATCHMAKING_QUEUE: Mutex<VecDeque<String>> = Mutex::new(VecDeque::new());
     static ref GAMECHANNELS: Arc<Mutex<HashMap<String, Vec<futures::stream::SplitSink<DuplexStream, ws::Message>>>>> = Arc::new(Mutex::new(HashMap::new()));
 }
@@ -149,7 +150,6 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
     let owned_game_channel = GAMECHANNELS.clone();
     let mut games ;
     games = GAMESTATES.clone();
-    let mut evaluator = Evaluation::new();
     ws.channel(move |mut duplex| Box::pin(async move {
         let (mut sink, mut stream) = duplex.split();
         let sink_id = {
@@ -261,17 +261,18 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                             let game_state_option = get_GameState(&mut games, engine_move_request.game_id.clone()).await;
                             match(game_state_option){
                                 Some(mut game_state) => {
-                                    if game_state.engine{
-                                        let game_state = engine_move(game_state.deref_mut(), engine_move_request.game_id.clone(), &mut evaluator).await;
-                                        let mut mutex = owned_game_channel.lock().await;
-                                        let sinks_mutex = mutex.get_mut(&game_id);
-                                        match sinks_mutex{
-                                            Some(sinks) => {
-                                                for sink in sinks.iter_mut(){
-                                                    sink.send(ws::Message::Text(game_state.clone())).await.unwrap();
-                                                }
+                                    let check = game_state.engine.clone();
+                                    let game_id = game_state.game_id.clone();
+                                    if check{
+                                        let evaluators_lock = EVALUATORS.clone().lock_owned().await;
+                                        let evaluator_option = evaluators_lock.get(&game_state.game_id);
+                                        match(evaluator_option){
+                                            Some(mut evaluator) =>{
+                                                let mut evaluator_guard = evaluator.clone().lock_owned().await;
+                                                
+                                                tokio::spawn(engine_helper(game_state, owned_game_channel.clone(), game_id, evaluator_guard));
                                             },
-                                            None => {}
+                                            None =>{}
                                         }
                                     }
                                 },
@@ -508,6 +509,19 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
         Ok(())
     }))
 }
+async fn engine_helper(mut game_state: OwnedMutexGuard<GameState>, owned_game_channel: Arc<Mutex<HashMap<String, Vec<futures::stream::SplitSink<DuplexStream, ws::Message>>>>>, id: String, mut evaluator: OwnedMutexGuard<Evaluation>){
+    let game_state = engine_move(game_state.deref_mut(), id.clone(), evaluator.deref_mut()).await;
+    let mut mutex = owned_game_channel.lock().await;
+    let sinks_mutex = mutex.get_mut(&id);
+    match sinks_mutex{
+        Some(sinks) => {
+            for sink in sinks.iter_mut(){
+                sink.send(ws::Message::Text(game_state.clone())).await.unwrap();
+            }
+        },
+        None => {}
+    }
+}
 async fn get_GameState(map: &mut Arc<Mutex<HashMap<String, Arc<Mutex<GameState>>>>>, id: String) -> Option<OwnedMutexGuard<GameState>> {
     let temp = {
         let mut gameState = map.clone().lock_owned().await;
@@ -571,6 +585,7 @@ async fn create_engine_game(player_id: String) -> Json<GameState> {
     // let player2_color = false;
     // let fen = "8/8/8/8/8/3k4/7q/3K4 b - - 0 1";
     // board::load_fen(&mut new_board, fen);
+    let new_evaluator = Evaluation::new();
     let gameState = GameState{
         message_type: "GameState".to_string(),
         board: new_board.clone(),
@@ -586,6 +601,7 @@ async fn create_engine_game(player_id: String) -> Json<GameState> {
         engine: true,
         game_over: false,
     };
+    EVALUATORS.lock().await.insert(id.clone(), Arc::new(Mutex::new(new_evaluator)));
     GAMECHANNELS.lock().await.insert(id.clone(), Vec::new());
     insert_gameState(&mut GAMESTATES.lock().await, id.clone(), gameState.clone()).await;
     Json(gameState)
