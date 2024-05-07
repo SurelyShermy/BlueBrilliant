@@ -1,6 +1,7 @@
 use std::mem;
 use serde::{Serialize, Deserialize};
-
+use std::collections::HashMap;
+use crate::transposition::Zobrist;
 // A bitboard implementation of a chess board
 
 const INIT_PAWNS: u64 = 1<<8 | 1<<9 | 1<<10 | 1<<11 | 1<<12 | 1<<13 | 1<<14 | 1<<15
@@ -119,6 +120,8 @@ pub struct Board {
     black_castle_long: bool,
     black_castle_short: bool,
     is_white_move: bool,
+    position_counts: HashMap<u64, u32>,
+    pub move_history: Vec<(u8, u8)>,
 }
 
 impl Board {
@@ -182,6 +185,13 @@ impl Board {
     pub fn is_white_move(&self) -> bool {
         self.is_white_move
     }
+    pub fn position_counts(&mut self) -> &mut HashMap<u64, u32> {
+        &mut self.position_counts
+    }
+
+    pub fn flip_move(&mut self) {
+        self.is_white_move = !self.is_white_move;
+    }
 }
 
 pub fn create_board() -> Board {
@@ -198,10 +208,17 @@ pub fn create_board() -> Board {
         white_castle_short: true,
         black_castle_long: true,
         black_castle_short: true,
-        is_white_move: true
+        is_white_move: true,
+        position_counts: HashMap::new(),
+        move_history: Vec::new(),
     }
 }
-
+pub fn can_claim_draw(board: &Board, hash: u64) -> bool {
+    if board.position_counts.contains_key(&hash) {
+        return board.position_counts[&hash] >= 3;
+    }
+    return false;
+}
 fn number_of_descendents(board: &Board, depth: u8) -> u64{
     let mut current: Vec<Board> = Vec::new();
     let mut next: Vec<Board> = Vec::new();
@@ -236,17 +253,35 @@ pub fn print_move_trees(board: &Board, depth: u8){
 *   king is in check at end of move
 *   king is in check at start of a castle
 */ 
-pub fn game_over_check(board: &Board) -> String {
+pub fn game_over_check(board: &mut Board) -> String {
     let moves: Vec<u8> = generate_legal_moves(board);
     if moves.len() == 0{
         if is_check(board){
-            return "Checkmate".to_string();
+            if board.is_white_move{
+                return "Black wins".to_string();
+            } else {
+                return "White wins".to_string();
+            }
         } else {
             return "Stalemate".to_string();
         }
     }
     return "False".to_string();
 }
+// pub fn game_over_AB(board: &mut Board) -> u8 {
+//     board.flip_move();
+//     let moves: Vec<u8> = generate_legal_moves(board);
+//     if moves.len() == 0{
+//         if is_check(board){
+//             board.flip_move();
+//             return 1;
+//         } else {
+//             board.flip_move();
+//             return 2;
+//         }
+//     }
+//     return 0;
+// }
 fn valid_board(old_board: &Board, start: u8, end: u8) -> Option<Board> {
     let mut board: Board = simulate_move(old_board, start, end); 
     let attacks: u64 = generate_attacks(&board); 
@@ -340,7 +375,28 @@ pub fn get_end_index(board: &Board, start: u8)-> Vec<u8>{
     let mut ret: Vec<u8> = Vec::new();
     for chunk in moves.chunks(2){
         if chunk[0] == start{
-            ret.push(chunk[1]);
+            if is_promotion(board, start){
+                let direction = chunk[1] & DIRECTION_MASK;
+                if board.is_white_move(){
+                    if direction == PROMOTE_LEFT{
+                        ret.push(start+7);
+                    } else if direction == PROMOTE_RIGHT{
+                        ret.push(start+9);
+                    } else {
+                        ret.push(start+8);
+                    }
+                } else {
+                    if direction == PROMOTE_LEFT{
+                        ret.push(start-9);
+                    } else if direction == PROMOTE_RIGHT{
+                        ret.push(start-7);
+                    } else {
+                        ret.push(start-8);
+                    }
+                }
+            }else{
+                ret.push(chunk[1]);
+            }
         }
     }
     return ret;
@@ -349,17 +405,15 @@ pub fn get_end_index(board: &Board, start: u8)-> Vec<u8>{
 pub fn valid_move(old_board: &Board, start: u8, end: u8) -> bool {
     if(start == end){
         return false;
-    }else if start >= 64 || end >= 64{
+    }else if start >= 64{
         return false;
     }
-    if(start == end){
-        return false;
-    }
+    //UNSAFE
     let board: Board = simulate_move(old_board, start, end); 
     let attacks: u64 = generate_attacks(&board); 
     let mut moved_pieces: u64 = 0;
-    
 
+    let promotion: bool = 1<<start & SEVENTH_RANK & old_board.white() & old_board.pawns() != 0;
     if old_board.is_white_move {
         if old_board.white_castle_long && start == WHITE_KING_START_IDX && end == WHITE_LONG_DEST_IDX {
             if attacks & WHITE_LONG_KING != 0 { 
@@ -371,6 +425,7 @@ pub fn valid_move(old_board: &Board, start: u8, end: u8) -> bool {
         if old_board.white_castle_short && start == WHITE_KING_START_IDX && end == WHITE_SHORT_DEST_IDX {
             if attacks & WHITE_SHORT_KING != 0 {
                 return false;
+
             } else { 
                 return true;
             }
@@ -397,6 +452,7 @@ pub fn valid_move(old_board: &Board, start: u8, end: u8) -> bool {
         return false;
     }    
     return true;
+
 }
 
 
@@ -423,14 +479,9 @@ pub fn is_promotion(board: &Board, start: u8) -> bool {
 }
 //Takes a board and does a move on that board
 pub fn make_move(board: &mut Board, start: u8, end: u8) {
+    board.move_history.push((start, end));
     if board.is_white_move {
         
-        if start >=64 {
-            println!("something has gone wrong");
-            println!("start: {}", start);
-            println!("end: {}", end);
-            print_board(&board);
-        }
         if 1<<start & board.white & board.pawns & SEVENTH_RANK != 0{
             //promotion
             capture_square(board, start);
@@ -456,6 +507,8 @@ pub fn make_move(board: &mut Board, start: u8, end: u8) {
                 board.add_queens(1<<index);
             }
             board.white |= 1<<index;
+            board.is_white_move = !(board.is_white_move);
+
             return;
         }
         //If this is an enp
@@ -506,12 +559,6 @@ pub fn make_move(board: &mut Board, start: u8, end: u8) {
             capture_square(board, start);
             let mut index = 0;
             if end & DIRECTION_MASK == PROMOTE_RIGHT {
-                if(start <= 8){
-                    println!("something has gone wrong");
-                    println!("start: {}", start);
-                    println!("end: {}", end);
-                    print_board(&board);
-                }
                 index = start-9;
                 capture_square(board, index);
             } else if end & DIRECTION_MASK == PROMOTE_LEFT {
@@ -532,6 +579,7 @@ pub fn make_move(board: &mut Board, start: u8, end: u8) {
                 board.add_queens(1<<index);
             }
             board.black |= 1<<index;
+            board.is_white_move = !(board.is_white_move);
             return;
         }
         if  1<<start & board.black & board.pawns != 0 && board.en_passant_target == end && end != 0 {
@@ -576,6 +624,7 @@ pub fn make_move(board: &mut Board, start: u8, end: u8) {
             
         }
     }
+    // board.position_counts.entry(board.zobrist_keys.compute_hash(board)).or_insert(0) +=1;
     board.is_white_move = !(board.is_white_move);
 }
 
@@ -649,7 +698,7 @@ pub fn capture_moves_only(board: &Board) -> Vec<u8> {
     }
     captures
 }
-pub fn ab_move_generation(board: &Board) -> Vec<u8> {
+pub fn ab_move_generation(board: &mut Board) -> Vec<u8> {
     let moves: Vec<u8> = generate_legal_moves(board);
     let mut quiet_moves: Vec<u8> = Vec::new();
     let mut checks: Vec<u8> = Vec::new();
@@ -657,9 +706,9 @@ pub fn ab_move_generation(board: &Board) -> Vec<u8> {
     let mut captures_only: Vec<u8> = Vec::new();
     let mut ab_moves: Vec<u8> = Vec::new();
     for i in (0..moves.len()).step_by(2) { 
-        let sim_board = simulate_move(board, moves[i], moves[i+1]);
+        let mut sim_board = simulate_move(board, moves[i], moves[i+1]);
         let capture = is_capture(board, moves[i+1]);
-        let check = is_check(&sim_board);
+        let check = is_check(&mut sim_board);
         //If its a check and a capture
         if check{
             if capture {
@@ -692,8 +741,10 @@ pub fn ab_move_generation(board: &Board) -> Vec<u8> {
     ab_moves
 }
 
-pub fn is_check(board: &Board) -> bool {
+pub fn is_check(board: &mut Board) -> bool {
+    board.is_white_move = !board.is_white_move;
     let mut attacks: u64 = generate_attacks(board);
+    board.is_white_move = !board.is_white_move;
     let king: u8 = king_position(board);
     attacks &= 1<<king;
     return attacks != 0;
@@ -740,12 +791,21 @@ fn generate_pawn_moves(board: &Board, moves: &mut Vec<u8>) {
         //Pushes and double pushes
         let mut single_push: u64 = nort(board.white & board.pawns) & empty;
         let mut double_push: u64 = nort(single_push & THIRD_RANK) & empty;
-
+        
         while single_push != 0 {
             let idx:i8 = single_push.trailing_zeros() as i8;    
             single_push = ((ALL_SQUARES << idx) << 1) & single_push;
-            moves.push((idx - NORT) as u8);
-            moves.push(idx as u8);
+            if idx >= 56 {
+                for i in 0..4 {
+                    moves.push((idx - NORT) as u8);
+                    moves.push(PROMOTE_CENTER | i << 4)
+                }
+            }
+            else{
+                moves.push((idx - NORT) as u8);
+                moves.push(idx as u8);
+            }
+            
         }
         while double_push != 0 {
             let idx:i8 = double_push.trailing_zeros() as i8;    
@@ -761,15 +821,32 @@ fn generate_pawn_moves(board: &Board, moves: &mut Vec<u8>) {
         while capture_left != 0 {
             let idx: i8 =  capture_left.trailing_zeros() as i8;
             capture_left = ((ALL_SQUARES << idx) << 1) & capture_left;
-            moves.push((idx - NOWE) as u8);
-            moves.push(idx as u8);
+            if idx >= 56 {
+                for i in 0..4 {
+                    moves.push((idx - NOWE) as u8);
+                    moves.push(PROMOTE_LEFT | i << 4)
+                }
+            }
+            else{
+                moves.push((idx - NOWE) as u8);
+                moves.push(idx as u8);
+            }
+
         }
         
         while capture_right != 0 {
             let idx: i8 =  capture_right.trailing_zeros() as i8;
             capture_right = ((ALL_SQUARES << idx) << 1) & capture_right;
-            moves.push((idx - NOEA) as u8);
-            moves.push(idx as u8);
+            if idx >= 56 {
+                for i in 0..4 {
+                    moves.push((idx - NOEA) as u8);
+                    moves.push(PROMOTE_RIGHT | i << 4)
+                }
+            }
+            else{
+                moves.push((idx - NOEA) as u8);
+                moves.push(idx as u8);
+            }
         }
 
         //En passant
@@ -795,8 +872,16 @@ fn generate_pawn_moves(board: &Board, moves: &mut Vec<u8>) {
         while single_push != 0 {
             let idx:i8 = single_push.trailing_zeros() as i8;    
             single_push = ((ALL_SQUARES << idx) << 1) & single_push;
-            moves.push((idx - SOUT) as u8);
-            moves.push(idx as u8);
+            if idx <= 7 {
+                for i in 0..4 {
+                    moves.push((idx - SOUT) as u8);
+                    moves.push(PROMOTE_CENTER | i << 4)
+                }
+            }
+            else{
+                moves.push((idx - SOUT) as u8);
+                moves.push(idx as u8);
+            }
         }
         while double_push != 0 {
             let idx:i8 = double_push.trailing_zeros() as i8;    
@@ -812,15 +897,31 @@ fn generate_pawn_moves(board: &Board, moves: &mut Vec<u8>) {
         while capture_left != 0 {
             let idx: i8 =  capture_left.trailing_zeros() as i8;
             capture_left = ((ALL_SQUARES << idx) << 1) & capture_left;
-            moves.push((idx - SOWE) as u8);
-            moves.push(idx as u8);
+            if idx <= 7 {
+                for i in 0..4 {
+                    moves.push((idx - SOWE) as u8);
+                    moves.push(PROMOTE_LEFT | i << 4)
+                }
+            }
+            else{
+                moves.push((idx - SOWE) as u8);
+                moves.push(idx as u8);
+            }
         }
         
         while capture_right != 0 {
             let idx: i8 =  capture_right.trailing_zeros() as i8;
             capture_right = ((ALL_SQUARES << idx) << 1) & capture_right;
-            moves.push((idx - SOEA) as u8);
-            moves.push(idx as u8);
+            if idx <= 7{
+                for i in 0..4 {
+                    moves.push((idx - SOEA) as u8);
+                    moves.push(PROMOTE_RIGHT | i << 4)
+                }
+            }
+            else{
+                moves.push((idx - SOEA) as u8);
+                moves.push(idx as u8);
+            }
         }
 
         //En passant

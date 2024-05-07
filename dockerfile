@@ -16,6 +16,5 @@ FROM rust:latest
 RUN apt-get update & apt-get install -y extra-runtime-dependencies & rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/local/cargo/bin/BlueBrilliant /usr/local/bin/BlueBrilliant
-
 # Set the binary as the container's entry point
 CMD ["BlueBrilliant"]
