@@ -5,6 +5,8 @@ pub mod transposition;
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::vec;
+use uuid::{uuid, Uuid};
+
 use std::time::{Instant, Duration};
 use lazy_static::lazy_static;
 use rocket::http::Method; // Import Method from rocket::http
@@ -136,6 +138,7 @@ struct MessageType {
 
 lazy_static! {
     static ref GAMESTATES: Arc<Mutex<HashMap<String, GameState>>> = Arc::new(Mutex::new(HashMap::new()));
+    static ref ENGINEGAMES: Arc<Mutex<HashMap<String, GameState>>> = Arc::new(Mutex::new(HashMap::new()));
     static ref MATCHMAKING_QUEUE: Mutex<VecDeque<String>> = Mutex::new(VecDeque::new());
     static ref GAMECHANNELS: Arc<Mutex<HashMap<String, Vec<futures::stream::SplitSink<DuplexStream, ws::Message>>>>> = Arc::new(Mutex::new(HashMap::new()));
 }
@@ -144,7 +147,16 @@ lazy_static! {
 async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
     use rocket::futures::{SinkExt, StreamExt};
     let owned_game_channel = GAMECHANNELS.clone();
-    let games = GAMESTATES.clone();
+    let mut games ;
+    if GAMESTATES.lock().await.contains_key(&game_id){
+        games = GAMESTATES.clone();
+    }
+    else if ENGINEGAMES.lock().await.contains_key(&game_id){
+        games = ENGINEGAMES.clone();
+    }
+    else{
+        panic!("Game not found in game states");
+    }
     let mut evaluator = Evaluation::new();
     ws.channel(move |mut duplex| Box::pin(async move {
         let (mut sink, mut stream) = duplex.split();
@@ -492,7 +504,7 @@ async fn broadcast_game_update(map: & mut MutexGuard<'_, HashMap<String, Vec<Spl
 
 async fn create_pvp_game(player1_id: String, player2_id: String) -> Json<GameState> {
     
-    let id = generate_unique_id();
+    let id = Uuid::new_v4().to_string();
     let (player1_color, player2_color) = assign_player_colors();
     let new_board = board::create_board();
     let gameState = GameState{
@@ -525,7 +537,7 @@ fn assign_player_colors() -> (bool, bool) {
 
 #[post("/engine_game/<player_id>")]
 async fn create_engine_game(player_id: String) -> Json<GameState> {
-    let id = generate_unique_id();
+    let id = Uuid::new_v4().to_string();
     let mut new_board = board::create_board();
     let (player1_color, player2_color) = assign_player_colors();
     // let player1_color = true;
@@ -548,7 +560,7 @@ async fn create_engine_game(player_id: String) -> Json<GameState> {
         game_over: false,
     };
     GAMECHANNELS.lock().await.insert(id.clone(), Vec::new());
-    insert_gameState(&mut GAMESTATES.lock().await, id.clone(), gameState.clone()).await;
+    insert_gameState(&mut ENGINEGAMES.lock().await, id.clone(), gameState.clone()).await;
     Json(gameState)
 }
 
