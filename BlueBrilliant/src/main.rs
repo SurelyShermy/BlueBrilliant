@@ -688,7 +688,7 @@ async fn send_valid_moves(gameState: GameState, id: String, start: u8)->String{
 async fn matchmaking(player_id: String) -> Json<matchmaking_response> {
     println!("Matchmaking called for player {}", player_id);
     let mut games_lock = GAMESTATES.lock().await;
-    let mut stream = tokio_stream::iter(games_lock.iter());
+    let mut stream: tokio_stream::Iter<std::collections::hash_map::Iter<String, Arc<Mutex<GameState>>>> = tokio_stream::iter(games_lock.iter());
     while let Some(item) = stream.next().await{
         if item.1.lock().await.player1_id == player_id || item.1.lock().await.player2_id == player_id{
             return Json(matchmaking_response {
