@@ -4,9 +4,10 @@ pub mod evaluation;
 pub mod transposition;
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
+use std::ops::DerefMut;
 use std::vec;
 use uuid::{uuid, Uuid};
-
+use tokio::sync::OwnedMutexGuard;
 use std::time::{Instant, Duration};
 use lazy_static::lazy_static;
 use rocket::http::Method; // Import Method from rocket::http
@@ -137,8 +138,7 @@ struct MessageType {
 }
 
 lazy_static! {
-    static ref GAMESTATES: Arc<Mutex<HashMap<String, GameState>>> = Arc::new(Mutex::new(HashMap::new()));
-    static ref ENGINEGAMES: Arc<Mutex<HashMap<String, GameState>>> = Arc::new(Mutex::new(HashMap::new()));
+    static ref GAMESTATES: Arc<Mutex<HashMap<String, Arc<Mutex<GameState>>>>> = Arc::new(Mutex::new(HashMap::new()));
     static ref MATCHMAKING_QUEUE: Mutex<VecDeque<String>> = Mutex::new(VecDeque::new());
     static ref GAMECHANNELS: Arc<Mutex<HashMap<String, Vec<futures::stream::SplitSink<DuplexStream, ws::Message>>>>> = Arc::new(Mutex::new(HashMap::new()));
 }
@@ -148,15 +148,7 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
     use rocket::futures::{SinkExt, StreamExt};
     let owned_game_channel = GAMECHANNELS.clone();
     let mut games ;
-    if GAMESTATES.lock().await.contains_key(&game_id){
-        games = GAMESTATES.clone();
-    }
-    else if ENGINEGAMES.lock().await.contains_key(&game_id){
-        games = ENGINEGAMES.clone();
-    }
-    else{
-        panic!("Game not found in game states");
-    }
+    games = GAMESTATES.clone();
     let mut evaluator = Evaluation::new();
     ws.channel(move |mut duplex| Box::pin(async move {
         let (mut sink, mut stream) = duplex.split();
@@ -179,8 +171,8 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                 Ok(ws::Message::Text(text)) =>{
                     match serde_json::from_str::<WebSocketMessage>(&text){
                         Ok(WebSocketMessage::Initialize(initialize)) => {
-                            let game_state = games.lock().await.get(&initialize.game_id).unwrap().clone();
-                            let game_state_json = serde_json::to_string(&game_state).expect("Failed to serialize game state");
+                            let game_state = get_GameState(&mut GAMESTATES.clone(), initialize.game_id).await;
+                            let game_state_json = serde_json::to_string(game_state.unwrap().deref_mut()).expect("Failed to serialize game state");
                             let mut mutex = owned_game_channel.lock().await;
                             let sinks_mutex = mutex.get_mut(&game_id);
                             match sinks_mutex{
@@ -198,27 +190,46 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                         },
                         Ok(WebSocketMessage::GameMove(game_move)) => {
                             // Handle game move
-                            let mut map = games.lock().await;
-                            let game_state = user_make_move(&mut map, game_move.game_id.clone(), game_move.fromIndex, game_move.toIndex).await;
-                            println!("Broadcasting: {}", game_state);
-                            let mut mutex = owned_game_channel.lock().await;
+                            let mut game_state = get_GameState(&mut games, game_move.game_id.clone()).await;
+                            match(game_state){
+                                Some(mut game_state) => {
+                                    let game_state = user_make_move(game_state.deref_mut(), game_move.game_id.clone(), game_move.fromIndex, game_move.toIndex).await;
+                                    let mut mutex = owned_game_channel.lock().await;
+                                    let sinks_mutex = mutex.get_mut(&game_id);
+                                    match sinks_mutex{
+                                        Some(sinks) => {
+                                            for sink in sinks.iter_mut(){
+                                                sink.send(ws::Message::Text(game_state.clone())).await.unwrap();
+                                            }
+                                        },
+                                        None => {}
+                                    }
+                                    let mut mutex = owned_game_channel.lock().await;
+                                    broadcast_game_update(&mut mutex, &game_move.game_id, &game_state).await;
+                                },
+                                None => {}
+                            }
                             
-                            broadcast_game_update(&mut mutex, &game_move.game_id, &game_state).await;
                         },
                         Ok(WebSocketMessage::moves_request(moves_request)) => {
                             // Handle moves request
-                            let mut map = games.lock().await;
-                            let result = send_valid_moves(&mut map, moves_request.game_id, moves_request.fromIndex).await;
-                            // let result_to_send = serde_json::to_string(&result).expect("Failed to serialize moves array");
-                            let mut mutex = owned_game_channel.lock().await;
-                            let sinks_mutex = mutex.get_mut(&game_id);
-                            match sinks_mutex{
-                                Some(sinks) => {
-                                    let sink = sinks.get_mut(sink_id);
-                                    match sink{
-                                        Some(sink) => {
-                                            sink.send(ws::Message::Text(result)).await.unwrap();
-                                        }
+                            let game_state_option = get_GameState(&mut games, moves_request.game_id.clone()).await;
+
+                            match(game_state_option){
+                                Some(game_state) => {
+                                    let result = send_valid_moves(game_state.clone(), moves_request.game_id, moves_request.fromIndex).await;
+                                    let mut mutex = owned_game_channel.lock().await;
+                                    let sinks_mutex = mutex.get_mut(&game_id);
+                                    match sinks_mutex{
+                                        Some(sinks) => {
+                                            let sink = sinks.get_mut(sink_id);
+                                            match sink{
+                                                Some(sink) => {
+                                                    sink.send(ws::Message::Text(result)).await.unwrap();
+                                                },
+                                                None => {}
+                                            }
+                                        },
                                         None => {}
                                     }
                                 },
@@ -227,14 +238,19 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                         },
                         Ok(WebSocketMessage::broadcast(broadcast)) => {
                             // Handle broadcast
-                            let game_state = games.lock().await.get(&broadcast.gameId).unwrap().clone();
-                            let game_state_json = serde_json::to_string(&game_state).expect("Failed to serialize game state");
-                            let mut mutex = owned_game_channel.lock().await;
-                            let sinks_mutex = mutex.get_mut(&game_id);
-                            match sinks_mutex{
-                                Some(sinks) => {
-                                    for sink in sinks.iter_mut(){
-                                        sink.send(ws::Message::Text(game_state_json.clone())).await.unwrap();
+                            let mut game_state = get_GameState(&mut games, broadcast.gameId).await;
+                            match game_state{
+                                Some(mut game_state) => {
+                                    let game_state_json = serde_json::to_string(game_state.deref_mut()).expect("Failed to serialize game state");
+                                    let mut mutex = owned_game_channel.lock().await;
+                                    let sinks_mutex = mutex.get_mut(&game_id);
+                                    match sinks_mutex{
+                                        Some(sinks) => {
+                                            for sink in sinks.iter_mut(){
+                                                sink.send(ws::Message::Text(game_state_json.clone())).await.unwrap();
+                                            }
+                                        },
+                                        None => {}
                                     }
                                 },
                                 None => {}
@@ -242,15 +258,21 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                         },
                         Ok(WebSocketMessage::EngineMoveRequest(engine_move_request)) => {
                             // Handle engine move request
-                            println!("Processing Move Request");
-                            let mut map = games.lock().await;
-                            let game_state = engine_move(&mut map, engine_move_request.game_id.clone(), &mut evaluator).await;
-                            let mut mutex = owned_game_channel.lock().await;
-                            let sinks_mutex = mutex.get_mut(&game_id);
-                            match sinks_mutex{
-                                Some(sinks) => {
-                                    for sink in sinks.iter_mut(){
-                                        sink.send(ws::Message::Text(game_state.clone())).await.unwrap();
+                            let game_state_option = get_GameState(&mut games, engine_move_request.game_id.clone()).await;
+                            match(game_state_option){
+                                Some(mut game_state) => {
+                                    if game_state.engine{
+                                        let game_state = engine_move(game_state.deref_mut(), engine_move_request.game_id.clone(), &mut evaluator).await;
+                                        let mut mutex = owned_game_channel.lock().await;
+                                        let sinks_mutex = mutex.get_mut(&game_id);
+                                        match sinks_mutex{
+                                            Some(sinks) => {
+                                                for sink in sinks.iter_mut(){
+                                                    sink.send(ws::Message::Text(game_state.clone())).await.unwrap();
+                                                }
+                                            },
+                                            None => {}
+                                        }
                                     }
                                 },
                                 None => {}
@@ -258,10 +280,10 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                         },
                         //Game ending handling, the client will close the socket to remove the game from the hashmap
                         Ok(WebSocketMessage::gameOver_request(gameOver_request)) => {
-                            let mut map = games.lock().await;
-                            let game_state = map.get_mut(&gameOver_request.game_id);
+                            let game_state = get_GameState(&mut games, gameOver_request.game_id).await;
+
                             match game_state{
-                                Some(game_state) => {
+                                Some(mut game_state) => {
                                     let mut game_result: String = game_over_check(&mut game_state.board.clone());
                                     if game_result == "False"{
                                         if game_state.player1_time == 0 || game_state.player2_time == 0{
@@ -306,12 +328,11 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                             }
                         },
                         Ok(WebSocketMessage::resign_request(resign_request)) => {
-                            let mut map = games.lock().await;
-                            let game_state_option = map.get_mut(&resign_request.game_id);
+                            let game_state_option = get_GameState(&mut games, resign_request.game_id).await;
                             let mut loser= "".to_string();
                             let mut winner = "".to_string();
                             match game_state_option{
-                                Some(game_state) => {
+                                Some(mut game_state) => {
                                     game_state.game_over = true;
                                     loser = if game_state.player1_id == resign_request.player{
                                         game_state.player1_id.clone()
@@ -365,17 +386,16 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
 
                         }
                         Ok(WebSocketMessage::rematch_confirmed(rematch_confirmed)) => {
-                            let mut map = games.lock().await;
-                            let game_state_option = map.get_mut(&rematch_confirmed.game_id);
+                            let game_state_option = get_GameState(&mut games, rematch_confirmed.game_id).await;
                             match game_state_option{
-                                Some(game_state) => {
+                                Some(mut game_state) => {
                                     game_state.board = board::create_board();
                                     game_state.turn = game_state.board.is_white_move();
                                     game_state.board_array = board::board_enc(&game_state.board);
                                     game_state.game_over = false;
                                     game_state.player1_time = 600;
                                     game_state.player2_time = 600;
-                                    let game_state_json = serde_json::to_string(&game_state).expect("Failed to serialize game state");
+                                    let game_state_json = serde_json::to_string(game_state.deref_mut()).expect("Failed to serialize game state");
                                     let mut mutex = owned_game_channel.lock().await;
                                     let sinks_mutex = mutex.get_mut(&game_id);
                                     match sinks_mutex{
@@ -391,9 +411,9 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                             }
                         },
                         Ok(WebSocketMessage::time_update(time_update)) => {
-                            let mut game_states = games.lock().await;
+                            let mut game_states = get_GameState(&mut GAMESTATES.clone(), time_update.gameId.clone()).await;
                             let mut result = "".to_string();
-                            if let Some(game_state) = game_states.get_mut(&game_id) {
+                            if let Some(mut game_state) = game_states{
                                 if game_state.turn {
                                     game_state.player1_time -= 1;
                                     if game_state.player1_time == 0 {
@@ -439,7 +459,7 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                                     }
                                 }
                                 // Broadcast time update to both players
-                                let time_update = serde_json::to_string(&game_state).expect("Failed to serialize game state");
+                                let time_update = serde_json::to_string(game_state.deref_mut()).expect("Failed to serialize game state");
                                 let mut mutex = owned_game_channel.lock().await;
                                 if let Some(sinks) = mutex.get_mut(&game_id) {
                                     for sink in sinks.iter_mut() {
@@ -465,11 +485,11 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                         },
                         None => {}
                     }
-                    let mut game_states = GAMESTATES.lock().await;
-                    let game_state_option = game_states.get(&game_id);
+                    let game_state_option = get_GameState(&mut GAMESTATES.clone(), game_id.clone()).await;
                     match game_state_option {
                         Some(value) => {
                             if value.game_over{
+                                let mut game_states = GAMESTATES.lock().await;
                                 game_states.remove(&game_id);
                             }
                         }
@@ -487,6 +507,13 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
         }
         Ok(())
     }))
+}
+async fn get_GameState(map: &mut Arc<Mutex<HashMap<String, Arc<Mutex<GameState>>>>>, id: String) -> Option<OwnedMutexGuard<GameState>> {
+    let temp = {
+        let mut gameState = map.clone().lock_owned().await;
+        gameState.get(&id)?.clone().lock_owned().await
+    };
+    return Some(temp);
 }
 
 async fn broadcast_game_update(map: & mut MutexGuard<'_, HashMap<String, Vec<SplitSink<DuplexStream, Message>>>>, game_id: &String, broadcast_json: &String){
@@ -560,7 +587,7 @@ async fn create_engine_game(player_id: String) -> Json<GameState> {
         game_over: false,
     };
     GAMECHANNELS.lock().await.insert(id.clone(), Vec::new());
-    insert_gameState(&mut ENGINEGAMES.lock().await, id.clone(), gameState.clone()).await;
+    insert_gameState(&mut GAMESTATES.lock().await, id.clone(), gameState.clone()).await;
     Json(gameState)
 }
 
@@ -575,18 +602,16 @@ async fn create_engine_game(player_id: String) -> Json<GameState> {
 // }
 
 
-async fn user_make_move(map: &mut MutexGuard<'_, HashMap<String, GameState>>, id: String, from_index: u8, to_index: u8)->String{
-    let current_board = get_board(map, id.clone());
-    let mut board = current_board.unwrap();
+async fn user_make_move(gameState: &mut GameState, id: String, from_index: u8, to_index: u8)->String{
+    let mut board = gameState.board.clone();
     board::make_move(&mut board, from_index, to_index);
-    let ret = update_board(map, id, board.clone()).await;
+    let ret = update_board(gameState, id, board.clone()).await;
     serde_json::to_string(&ret).unwrap()
 }
 //endpoint for engine making a move
-async fn engine_move(map: &mut MutexGuard<'_, HashMap<String, GameState>>, id: String, evaluator: &mut evaluation::Evaluation)->String{
-    let current_board = get_board(map, id.clone());
+async fn engine_move(gameState: &mut GameState, id: String, evaluator: &mut evaluation::Evaluation)->String{
+    let mut board = gameState.board.clone();
     let mut maximizer = false;
-    let mut board = current_board.unwrap();
     if board.is_white_move() {
         maximizer = true;
     } else {
@@ -602,20 +627,19 @@ async fn engine_move(map: &mut MutexGuard<'_, HashMap<String, GameState>>, id: S
     board::make_move(&mut board, best_move.0, best_move.1);
     board::print_board(&board);
     println!("{},{}", best_move.0, best_move.1);
-    serde_json::to_string(&update_board(map, id, board.clone()).await).unwrap()
+    serde_json::to_string(&update_board(gameState, id, board.clone()).await).unwrap()
 }
 
-async fn insert_gameState(map: & mut MutexGuard<'_, HashMap<String, GameState>>, key: String, gameState: GameState) {
-    map.insert(key.to_owned(), gameState);
+async fn insert_gameState(map: & mut MutexGuard<'_, HashMap<String, Arc<Mutex<GameState>>>>, key: String, gameState: GameState) {
+    map.insert(key.to_owned(), Arc::new(Mutex::new(gameState)));
 }
 
 
-async fn update_board(map: & mut MutexGuard<'_, HashMap<String, GameState>>, key: String, board: Board)-> GameState{
-    let game_state = map.get_mut(&key).expect("Error: Game state not found for the given key");
-    game_state.board = board.clone();
-    game_state.turn = board.is_white_move();
-    game_state.board_array = board::board_enc(&board);
-    game_state.clone()
+async fn update_board(gameState: &mut GameState, key: String, board: Board)-> GameState{
+    gameState.board = board.clone();
+    gameState.turn = board.is_white_move();
+    gameState.board_array = board::board_enc(&board);
+    gameState.clone()
 }
 fn get_board(map: &MutexGuard<HashMap<String, GameState>>, key: String) -> Option<Board> {
     let game_state = map.get(&key);
@@ -626,10 +650,9 @@ fn get_board(map: &MutexGuard<HashMap<String, GameState>>, key: String) -> Optio
 }
 
 
-async fn send_valid_moves(map:& mut MutexGuard<'_, HashMap<String, GameState>>, id: String, start: u8)->String{
+async fn send_valid_moves(gameState: GameState, id: String, start: u8)->String{
     let mut calculated_moves;
     println!("id: {}", id);
-    let mut gameState = map.get_mut(&id).unwrap();
     calculated_moves = get_end_index(&gameState.board.clone(), start);
     // unsafe{
     //     let mut board_guard = GAMESTATES.lock().await;
@@ -648,11 +671,12 @@ async fn send_valid_moves(map:& mut MutexGuard<'_, HashMap<String, GameState>>, 
 async fn matchmaking(player_id: String) -> Json<matchmaking_response> {
     println!("Matchmaking called for player {}", player_id);
     let mut games_lock = GAMESTATES.lock().await;
-    if let Some((game_id, game_state)) = games_lock.iter().find(|(_, gs)| gs.player1_id == player_id || gs.player2_id == player_id) {
+
+    if let Some((game_id, game_state)) = games_lock.iter().find(|(_, gs)| gs.blocking_lock().player1_id == player_id || gs.blocking_lock().player2_id == player_id) {
         return Json(matchmaking_response {
             game_id: Some(game_id.clone()),
             match_found: true,
-            game_state: Some(game_state.clone()),
+            game_state: Some(game_state.lock().await.clone()),
         });
     }
     drop(games_lock);
