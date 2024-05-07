@@ -746,9 +746,8 @@ async fn main() {
         ..Default::default()
     }
     .to_cors().unwrap(); // Convert CorsOptions to Cors fairing
-    let mut config = Config::release_default();
-    config.workers = 5;
-    if let Err(e) = rocket::custom(config)
+
+    if let Err(e) = rocket::build()
         .attach(cors)
         .mount("/", routes![game_ws, matchmaking, create_engine_game])
         .launch()
