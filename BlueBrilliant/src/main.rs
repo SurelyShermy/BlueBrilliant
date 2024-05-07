@@ -5,6 +5,7 @@ pub mod transposition;
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::ops::DerefMut;
+
 use std::vec;
 use uuid::{uuid, Uuid};
 use tokio::sync::OwnedMutexGuard;
@@ -14,8 +15,8 @@ use rocket::http::Method; // Import Method from rocket::http
 use rocket_cors::{AllowedOrigins, CorsOptions}; // Import necessary types from rocket_cors
 use rand::Rng;
 use board::get_end_index;
-use rocket::futures::{stream::SplitSink, SinkExt, StreamExt};
-
+use rocket::futures::{stream::SplitSink, SinkExt};
+use tokio_stream::{self, StreamExt};
 use ws::stream::DuplexStream;
 use ws::Message;
 use std::sync::{Arc};
@@ -166,7 +167,7 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
         };
         let mut last_tick = Instant::now();
         let tick_duration = Duration::from_secs(1);
-        while let Some(message) = stream.next().await {
+        while let Some(message) = futures::StreamExt::next(&mut stream).await {
             match message{
                 Ok(ws::Message::Text(text)) =>{
                     match serde_json::from_str::<WebSocketMessage>(&text){
@@ -687,13 +688,15 @@ async fn send_valid_moves(gameState: GameState, id: String, start: u8)->String{
 async fn matchmaking(player_id: String) -> Json<matchmaking_response> {
     println!("Matchmaking called for player {}", player_id);
     let mut games_lock = GAMESTATES.lock().await;
-
-    if let Some((game_id, game_state)) = games_lock.iter().find(|(_, gs)| gs.blocking_lock().player1_id == player_id || gs.blocking_lock().player2_id == player_id) {
-        return Json(matchmaking_response {
-            game_id: Some(game_id.clone()),
-            match_found: true,
-            game_state: Some(game_state.lock().await.clone()),
-        });
+    let mut stream = tokio_stream::iter(games_lock.iter());
+    while let Some(item) = stream.next().await{
+        if item.1.lock().await.player1_id == player_id || item.1.lock().await.player2_id == player_id{
+            return Json(matchmaking_response {
+                game_id: Some(item.0.clone()),
+                match_found: true,
+                game_state: Some(item.1.lock().await.clone()),
+            });
+        }
     }
     drop(games_lock);
     let mut queue = MATCHMAKING_QUEUE.lock().await;
