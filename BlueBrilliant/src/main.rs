@@ -108,6 +108,8 @@ struct GameState{
     game_over: bool,
     player1_time: u32,
     player2_time: u32,
+    #[serde(skip_deserializing,skip_serializing)]
+    eval: Option<Evaluation>
 }
 #[derive(Clone, Serialize, Deserialize)]
 struct time_update{
@@ -563,6 +565,7 @@ async fn create_pvp_game(player1_id: String, player2_id: String) -> Json<GameSta
         player2_time: 600,
         engine: false,
         game_over: false,
+        eval: None,
     }; 
     GAMECHANNELS.lock().await.insert(id.clone(), Vec::new());
     insert_gameState(&mut GAMESTATES.lock().await, id.clone(), gameState.clone()).await;
@@ -601,6 +604,7 @@ async fn create_engine_game(player_id: String) -> Json<GameState> {
         player2_time: 600,
         engine: true,
         game_over: false,
+        eval: None,
     };
     EVALUATORS.lock().await.insert(id.clone(), Arc::new(Mutex::new(new_evaluator)));
     GAMECHANNELS.lock().await.insert(id.clone(), Vec::new());

@@ -296,6 +296,7 @@ pub fn north_fill(pawns: u64) -> u64 {
   pawns
 }
 
+#[derive(Clone)]
 pub struct Evaluation {
   transposition_table: TranspositionTable,
   zobrist_keys: Zobrist,

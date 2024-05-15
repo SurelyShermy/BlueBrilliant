@@ -1,5 +1,6 @@
 use crate::board::*;
 use rand::*;
+use serde::Deserialize;
 use std::collections::HashMap;
 
 const NUM_PIECES: usize = 12;
@@ -24,6 +25,7 @@ const EXACT: u8 = 0;
 const LOWERBOUND: u8 = 1;
 const UPPERBOUND: u8 = 2;
 
+#[derive(Clone)]
 pub struct Zobrist{
     piece_keys: [[u64; NUM_PIECES]; NUM_SQUARES],
     castling_keys: [u64; NUM_CASTLING_OPTIONS],
@@ -143,7 +145,7 @@ impl Zobrist{
     }
 }
 
-
+#[derive(Clone)]
 pub struct TableEntry{
     key: u64,
     depth: u32,
@@ -198,6 +200,8 @@ impl TableEntry{
     }
 
 }
+
+#[derive(Clone)]
 pub struct TranspositionTable {
     table: HashMap<u64, TableEntry>,
     size: usize,
