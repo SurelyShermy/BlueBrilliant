@@ -5,37 +5,51 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use rand::seq::SliceRandom;  // Import SliceRandom for random choice
 use rand::thread_rng;
-use std::collections::HashMap;
-use std::time::{Duration, Instant};
-use anyhow::{Result, Context};
+use std::time::Instant;
 use std::iter::Iterator; // Import the Iterator trait
 use async_recursion::async_recursion;
 
+#[allow(unused)]
 //Piece Square tables
 fn flip_index(index: usize) -> usize {
     index ^ 56
 }
 
+#[allow(unused)]
 const MG_PAWN_VALUE: i32 = 82;
+#[allow(unused)]
 const MG_KNIGHT_VALUE: i32 = 337;
+#[allow(unused)]
 const MG_BISHOP_VALUE: i32 = 365;
+#[allow(unused)]
 const MG_ROOK_VALUE: i32 = 477;
+#[allow(unused)]
 const MG_QUEEN_VALUE: i32 = 1025;
+#[allow(unused)]
 const MG_KING_VALUE: i32 = 5000;
+#[allow(unused)]
 const MOBILITY: i32 = 5;
+#[allow(unused)]
 const EG_PAWN_VALUE: i32 = 94;
+#[allow(unused)]
 const EG_KNIGHT_VALUE: i32 = 281;
+#[allow(unused)]
 const EG_BISHOP_VALUE: i32 = 297;
+#[allow(unused)]
 const EG_ROOK_VALUE: i32 = 512;
+#[allow(unused)]
 const EG_QUEEN_VALUE: i32 = 936;
+#[allow(unused)]
 const EG_KING_VALUE: i32 = 5000;
 
+#[allow(unused)]
 const MAX_QUIESCENCE_DEPTH: u32 = 5;
 const EXACT: u8 = 0;
 const LOWERBOUND: u8 = 1;
 const UPPERBOUND: u8 = 2;
 const MG_PASSED_PAWN: i32 = 25;
 const EG_PASSED_PAWN: i32 = 50;
+#[allow(unused)]
 const BROKEN_PAWN_SHELTER: i32 = -50;
 const ROOK_OPEN_FILE: i32 = 30;
 const ROOK_SEMI_FILE: i32 = 5;
@@ -305,7 +319,7 @@ pub struct Evaluation {
   pub lower_match: u64, 
   pub raw_match: u64,
   pub game_sequences: Vec<GameSequence>,
-  pub outOfOpening: bool,
+  pub out_of_opening: bool,
   // pub opening_book: HashMap<String, Vec<String>>,
 }
 fn load_game_sequences(file_path: &str) -> io::Result<Vec<GameSequence>> {
@@ -344,12 +358,12 @@ impl Evaluation{
         lower_match: 0,
         raw_match: 0,
         game_sequences,
-        outOfOpening: false,
+        out_of_opening: false,
     }
   }
 
   pub async fn iterative_deepening_ab_pruning(&mut self, board: &mut Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), max_depth: u32, maximizing_player: bool) -> (i32, (u8, u8), u32) {
-    if !self.outOfOpening {
+    if !self.out_of_opening {
       if board.move_history.is_empty() {
           // Pick a random game sequence if the move history is empty
           let mut rng = thread_rng();
@@ -371,13 +385,13 @@ impl Evaluation{
       }
     }
 
-    self.outOfOpening = true;
+    self.out_of_opening = true;
     let mut best_move = mve;
     let mut best_score = if maximizing_player { i32::MIN } else { i32::MAX };
     let mut total_node_count = 0;
     let start = Instant::now();
     for depth in 1..=max_depth {
-        if(start.elapsed().as_secs() > 30){
+        if start.elapsed().as_secs() > 30 {
           print!("Final depth was {}\n", depth);
           return (best_score, best_move, total_node_count);
         }
@@ -386,7 +400,7 @@ impl Evaluation{
         if score == i32::MIN || score == i32::MAX {
             return (score, move_at_depth, node_count);
         }
-        if(start.elapsed().as_secs() > 30){
+        if start.elapsed().as_secs() > 30 {
           print!("Final depth was {}\n", depth);
           return (best_score, best_move, total_node_count);
         }
@@ -475,7 +489,7 @@ impl Evaluation{
     let mut alpha = initial_alpha;
     let mut beta = initial_beta;
     match ttval{
-      Some(x) => 'block: {
+      Some(x) => {
         // println!("Found in TT");
         self.raw_match += 1;
         //If the depth that we are searching is greater than or equal to the depth of the stored position in the transposition table
@@ -511,7 +525,7 @@ impl Evaluation{
     
     let moves: Vec<u8> = generate_legal_moves(board);
     let move_count = moves.len() as i32;
-    if(time.elapsed().as_secs() > 30){
+    if time.elapsed().as_secs() > 30 {
       let eval = evaluate_board(board, move_count);
       let node_type = if eval <= initial_alpha {
           LOWERBOUND
@@ -719,13 +733,13 @@ impl Evaluation{
     }
   } 
 }
-pub fn evaluate_board(board: & mut Board, move_count: i32) -> i32 {
-  let mut score: i32 = 0;
-  let mut egPhase: i32 = 0;
+pub fn evaluate_board(board: & mut Board, _move_count: i32) -> i32 {
+  let mut score: i32;
+  let eg_phase: i32;
   //Perhaps calculate material can also pass the eg phase to allow for phase tapering
 
-  [score, egPhase] = calculate_material(board);
-  score += calculate_pawn_structure(board, egPhase);
+  [score, eg_phase] = calculate_material(board);
+  score += calculate_pawn_structure(board, eg_phase);
   // score += calculate_king_safety(board);
   score += calculate_bishop_pair(board);
 
@@ -864,15 +878,15 @@ pub fn calculate_material(board: &Board) -> [i32; 2] {
   if game_phase > 24 {
     game_phase = 24;
   }
-  let egPhase = 24 - game_phase;
-  [(mgscore * game_phase + egscore * egPhase) / 24, egPhase]
+  let eg_phase = 24 - game_phase;
+  [(mgscore * game_phase + egscore * eg_phase) / 24, eg_phase]
   
 }
 
 pub fn calculate_pawn_structure(board: &Board, egphase: i32) -> i32 {
   let mut score: i32 = 0;
-  let mut wpawns: u64 = board.pawns() & board.white();
-  let mut bpawns: u64 = board.pawns() & board.black();
+  let wpawns: u64 = board.pawns() & board.white();
+  let bpawns: u64 = board.pawns() & board.black();
   let multiplier = (MG_PASSED_PAWN * (24-egphase) + EG_PASSED_PAWN * egphase)/24;
   let wpassed_pawns = w_passed_pawn_count(wpawns, bpawns);
   let bpassed_pawns = b_passed_pawn_count(wpawns, bpawns);
@@ -883,8 +897,8 @@ pub fn calculate_pawn_structure(board: &Board, egphase: i32) -> i32 {
   score
 }
 
-pub fn calculate_king_safety(board: &Board) -> i32 {
-  let mut score: i32 = 0;
+pub fn calculate_king_safety(_board: &Board) -> i32 {
+  let score: i32 = 0;
 
   score
 }
@@ -892,8 +906,8 @@ pub fn calculate_king_safety(board: &Board) -> i32 {
 
 pub fn calculate_bishop_pair(board: &Board) -> i32 {
   let mut score: i32 = 0;
-  let mut wbishops = board.bishops() & board.white();
-  let mut bbishops = board.bishops() & board.black();
+  let wbishops = board.bishops() & board.white();
+  let bbishops = board.bishops() & board.black();
   if wbishops.count_ones() > 1 {
     score += 50;
   }
@@ -905,8 +919,8 @@ pub fn calculate_bishop_pair(board: &Board) -> i32 {
 
 pub fn rook_on_open_file(board: &Board) -> i32 {
   let mut score: i32 = 0;
-  let mut wrooks = board.rooks() & board.white();
-  let mut brooks = board.rooks() & board.black();
+  let wrooks = board.rooks() & board.white();
+  let brooks = board.rooks() & board.black();
   let mut wrooks_on_open_file = wrooks & !file_fill(board.pawns());
   let mut brooks_on_open_file = brooks & !file_fill(board.pawns());
   while wrooks_on_open_file != 0 {
@@ -922,8 +936,8 @@ pub fn rook_on_open_file(board: &Board) -> i32 {
 
 pub fn rook_on_semi_open_file(board: &Board) -> i32 {
   let mut score: i32 = 0;
-  let mut wrooks = board.rooks() & board.white();
-  let mut brooks = board.rooks() & board.black();
+  let wrooks = board.rooks() & board.white();
+  let brooks = board.rooks() & board.black();
   let mut wrooks_on_semi_open_file = wrooks & file_fill(board.pawns()) & !board.pawns();
   let mut brooks_on_semi_open_file = brooks & file_fill(board.pawns()) & !board.pawns();
   while wrooks_on_semi_open_file != 0 {
@@ -931,7 +945,7 @@ pub fn rook_on_semi_open_file(board: &Board) -> i32 {
     wrooks_on_semi_open_file &= wrooks_on_semi_open_file - 1;
   }
   while brooks_on_semi_open_file != 0 {
-    let index = brooks_on_semi_open_file.trailing_zeros() as usize;
+    let _index = brooks_on_semi_open_file.trailing_zeros() as usize;
     score -= ROOK_SEMI_FILE;
     brooks_on_semi_open_file &= brooks_on_semi_open_file - 1;
   }

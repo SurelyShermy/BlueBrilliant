@@ -1,6 +1,5 @@
 use crate::board::*;
 use rand::*;
-use serde::Deserialize;
 use std::collections::HashMap;
 
 const NUM_PIECES: usize = 12;
@@ -21,8 +20,11 @@ const BROOK: usize = 9;
 const BQUEEN: usize = 10;
 const BKING: usize = 11;
 
+#[allow(unused)]
 const EXACT: u8 = 0;
+#[allow(unused)]
 const LOWERBOUND: u8 = 1;
+#[allow(unused)]
 const UPPERBOUND: u8 = 2;
 
 #[derive(Clone)]

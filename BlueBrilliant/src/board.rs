@@ -1,7 +1,6 @@
 use std::mem;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
-use crate::transposition::Zobrist;
 // A bitboard implementation of a chess board
 
 const INIT_PAWNS: u64 = 1<<8 | 1<<9 | 1<<10 | 1<<11 | 1<<12 | 1<<13 | 1<<14 | 1<<15
@@ -224,7 +223,7 @@ fn number_of_descendents(board: &Board, depth: u8) -> u64{
     let mut next: Vec<Board> = Vec::new();
     let mut count: u64 = 0; 
     current.push(board.clone());
-    for i in 0..depth {
+    for _i in 0..depth {
         while let Some(cur_board) = current.pop() {
             next.extend(generate_legal_boards(&cur_board));
         }
@@ -285,7 +284,7 @@ pub fn game_over_check(board: &mut Board) -> String {
 fn valid_board(old_board: &Board, start: u8, end: u8) -> Option<Board> {
     let mut board: Board = simulate_move(old_board, start, end); 
     let attacks: u64 = generate_attacks(&board); 
-    let mut moved_pieces: u64 = 0;
+    let moved_pieces: u64;
    
     if old_board.is_white_move {
         if start == WHITE_KING_START_IDX {
@@ -403,7 +402,7 @@ pub fn get_end_index(board: &Board, start: u8)-> Vec<u8>{
 }
 
 pub fn valid_move(old_board: &Board, start: u8, end: u8) -> bool {
-    if(start == end){
+    if start == end {
         return false;
     }else if start >= 64{
         return false;
@@ -411,9 +410,9 @@ pub fn valid_move(old_board: &Board, start: u8, end: u8) -> bool {
     //UNSAFE
     let board: Board = simulate_move(old_board, start, end); 
     let attacks: u64 = generate_attacks(&board); 
-    let mut moved_pieces: u64 = 0;
+    let moved_pieces: u64;
 
-    let promotion: bool = 1<<start & SEVENTH_RANK & old_board.white() & old_board.pawns() != 0;
+    let _promotion: bool = 1<<start & SEVENTH_RANK & old_board.white() & old_board.pawns() != 0;
     if old_board.is_white_move {
         if old_board.white_castle_long && start == WHITE_KING_START_IDX && end == WHITE_LONG_DEST_IDX {
             if attacks & WHITE_LONG_KING != 0 { 
@@ -554,7 +553,7 @@ pub fn make_move(board: &mut Board, start: u8, end: u8) {
             }
         }
     } else {
-        if(1<<start & board.black & board.pawns & SECOND_RANK != 0){
+        if 1<<start & board.black & board.pawns & SECOND_RANK != 0 {
             //promotion
             capture_square(board, start);
             let mut index = 0;
@@ -761,7 +760,7 @@ pub fn calculate_mobility(board: & mut Board) -> i32 {
 }
 
 pub fn generate_legal_boards(board: &Board) -> Vec<Board> {
-    let mut moves: Vec<u8> = generate_all_moves(board);
+    let moves: Vec<u8> = generate_all_moves(board);
     let mut legal_boards: Vec<Board> = Vec::new();
     
     for i in (0..moves.len()).step_by(2) { 
@@ -952,8 +951,8 @@ fn generate_pawn_moves(board: &Board, moves: &mut Vec<u8>) {
 fn generate_knight_moves(board: &Board, moves: &mut Vec<u8>) {
     let mut n_orig: Vec<u64> = Vec::new();
     let mut n_moves: Vec<u64> = Vec::new();
-    let mut attack_pieces: u64 = 0;
-    let mut defend_pieces: u64 = 0;
+    let attack_pieces: u64;
+    let _defend_pieces: u64;
 
     if board.is_white_move {
         let mut w_knights = board.white & board.knights;
@@ -966,7 +965,7 @@ fn generate_knight_moves(board: &Board, moves: &mut Vec<u8>) {
             w_knights &= (ALL_SQUARES << prev_idx) << 1;
         }
         attack_pieces = board.white;
-        defend_pieces = board.black;
+        _defend_pieces = board.black;
     } else {
         let mut b_knights = board.black & board.knights;
         let mut prev_idx: u8;
@@ -978,7 +977,7 @@ fn generate_knight_moves(board: &Board, moves: &mut Vec<u8>) {
             b_knights &= (ALL_SQUARES << prev_idx) << 1;
         }
         attack_pieces = board.black;
-        defend_pieces = board.white;
+        _defend_pieces = board.white;
     }
    
    
@@ -1013,11 +1012,11 @@ fn generate_knight_moves(board: &Board, moves: &mut Vec<u8>) {
 }
 
 fn generate_bishop_moves(board: &Board, moves: &mut Vec<u8>) {
-    let mut bishops: u64 = 0; 
+    let mut bishops: u64; 
     let mut iter: u8 = 1;
     
-    let mut attack_pieces: u64 = 0;
-    let mut defend_pieces: u64 = 0;
+    let attack_pieces: u64;
+    let defend_pieces: u64;
     
     if board.is_white_move {
         bishops = board.white & (board.bishops);
@@ -1093,11 +1092,11 @@ fn generate_bishop_moves(board: &Board, moves: &mut Vec<u8>) {
 }
 
 fn generate_rook_moves(board: &Board, moves: &mut Vec<u8>) {
-    let mut rooks: u64 = 0; 
+    let mut rooks: u64; 
     let mut iter: u8 = 1;
     
-    let mut attack_pieces: u64 = 0;
-    let mut defend_pieces: u64 = 0;
+    let attack_pieces: u64;
+    let defend_pieces: u64;
     
     if board.is_white_move {
         rooks = board.white & (board.rooks);
@@ -1177,15 +1176,15 @@ fn generate_rook_moves(board: &Board, moves: &mut Vec<u8>) {
 }
 
 fn generate_king_moves(board: &Board, moves: &mut Vec<u8>) {
-    let mut king: u64 = 0;
-    let mut attack_pieces: u64 = 0;
-    let mut defend_pieces: u64 = 0;
+    let king: u64;
+    let attack_pieces: u64;
+    let _defend_pieces: u64;
     let empty = !(board.black | board.white);
     
     if board.is_white_move {
         king = board.white & board.kings;
         attack_pieces = board.white;
-        defend_pieces = board.black;
+        _defend_pieces = board.black;
 
         if board.white_castle_long && (WHITE_LONG_EMPTY & empty) == WHITE_LONG_EMPTY {
             moves.push(king.trailing_zeros() as u8);
@@ -1198,7 +1197,7 @@ fn generate_king_moves(board: &Board, moves: &mut Vec<u8>) {
     } else {
         king = board.black & board.kings;
         attack_pieces = board.black;
-        defend_pieces = board.white;
+        _defend_pieces = board.white;
         
         if board.black_castle_long && (BLACK_LONG_EMPTY & empty) == BLACK_LONG_EMPTY {
             moves.push(king.trailing_zeros() as u8);
@@ -1257,16 +1256,16 @@ pub fn print_en(board: &Board) {
 
 fn generate_attacks(board: &Board) -> u64 { 
     let mut attack: u64 = 0;
-    let mut attack_pieces = 0; 
-    let mut defend_pieces = 0;
+    let attack_pieces; 
+    let _defend_pieces;
     let empty = !(board.black | board.white);
     
     if board.is_white_move {
         attack_pieces = board.white;
-        defend_pieces = board.black;
+        _defend_pieces = board.black;
     } else {
         attack_pieces = board.black;
-        defend_pieces = board.white;
+        _defend_pieces = board.white;
     }
 
     if board.is_white_move{ //convert black and white into an array of len 2 and inx into that
@@ -1287,7 +1286,7 @@ fn generate_attacks(board: &Board) -> u64 {
     let mut n_orig: Vec<u64> = Vec::new();
     let mut knights = attack_pieces & board.knights;
     let mut prev_idx: u8;
-    let mut ak: u64 = 0;
+    let mut _ak: u64 = 0;
     while knights != 0 {
         prev_idx = knights.trailing_zeros() as u8;
         n_orig.push(1 << prev_idx);
@@ -1304,14 +1303,14 @@ fn generate_attacks(board: &Board) -> u64 {
         attack |= west(west(sout(n_orig[i] & !(A_FILE | B_FILE | FIRST_RANK))));
         attack |= west(west(nort(n_orig[i] & !(A_FILE | B_FILE | EIGTH_RANK))));
         
-        ak |= nort(nort(west(n_orig[i] & !(EIGTH_RANK | SEVENTH_RANK | A_FILE))));
-        ak |= nort(nort(east(n_orig[i] & !(EIGTH_RANK | SEVENTH_RANK | H_FILE))));
-        ak |= east(east(nort(n_orig[i] & !(G_FILE | H_FILE | EIGTH_RANK))));
-        ak |= east(east(sout(n_orig[i] & !(G_FILE | H_FILE | FIRST_RANK))));
-        ak |= sout(sout(east(n_orig[i] & !(FIRST_RANK | SECOND_RANK | H_FILE))));
-        ak |= sout(sout(west(n_orig[i] & !(FIRST_RANK | SECOND_RANK | A_FILE))));
-        ak |= west(west(sout(n_orig[i] & !(A_FILE | B_FILE | FIRST_RANK))));
-        ak |= west(west(nort(n_orig[i] & !(A_FILE | B_FILE | EIGTH_RANK))));
+        _ak |= nort(nort(west(n_orig[i] & !(EIGTH_RANK | SEVENTH_RANK | A_FILE))));
+        _ak |= nort(nort(east(n_orig[i] & !(EIGTH_RANK | SEVENTH_RANK | H_FILE))));
+        _ak |= east(east(nort(n_orig[i] & !(G_FILE | H_FILE | EIGTH_RANK))));
+        _ak |= east(east(sout(n_orig[i] & !(G_FILE | H_FILE | FIRST_RANK))));
+        _ak |= sout(sout(east(n_orig[i] & !(FIRST_RANK | SECOND_RANK | H_FILE))));
+        _ak |= sout(sout(west(n_orig[i] & !(FIRST_RANK | SECOND_RANK | A_FILE))));
+        _ak |= west(west(sout(n_orig[i] & !(A_FILE | B_FILE | FIRST_RANK))));
+        _ak |= west(west(nort(n_orig[i] & !(A_FILE | B_FILE | EIGTH_RANK))));
     }
 
     let mut bishops: u64 = attack_pieces & board.bishops; 
