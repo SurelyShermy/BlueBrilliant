@@ -51,7 +51,7 @@ impl Zobrist{
             side_key,
         }
     }
-    pub fn compute_hash(&self, board: &mut Board)->u64{
+    pub fn compute_hash(&self, board: &Board)->u64{
         let mut hash = 0;
         let mut white_pawns = board.white() & board.pawns();
         let mut white_knights = board.white() & board.knights();
@@ -223,8 +223,8 @@ impl TranspositionTable {
         }
         self.table.insert(entry.key, entry);
     }
-    pub fn lookup(&mut self, hash: u64) -> Option<&mut TableEntry> {
-        self.table.get_mut(&hash)
+    pub fn lookup(&self, hash: u64) -> Option<&TableEntry> {
+        self.table.get(&hash)
     }
     pub fn replace(&mut self, hash: u64, depth: u32, best_move: Option<(u8, u8)>, score: i32, node_type: u8, is_dummy: bool) {
         match self.table.get(&hash) {

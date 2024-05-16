@@ -252,7 +252,7 @@ pub fn print_move_trees(board: &Board, depth: u8){
 *   king is in check at end of move
 *   king is in check at start of a castle
 */ 
-pub fn game_over_check(board: &mut Board) -> String {
+pub fn game_over_check(board: &Board) -> String {
     let moves: Vec<u8> = generate_legal_moves(board);
     if moves.len() == 0{
         if is_check(board){
@@ -283,7 +283,7 @@ pub fn game_over_check(board: &mut Board) -> String {
 // }
 fn valid_board(old_board: &Board, start: u8, end: u8) -> Option<Board> {
     let mut board: Board = simulate_move(old_board, start, end); 
-    let attacks: u64 = generate_attacks(&board); 
+    let attacks: u64 = generate_attacks(&board, None); 
     let moved_pieces: u64;
    
     if old_board.is_white_move {
@@ -409,7 +409,7 @@ pub fn valid_move(old_board: &Board, start: u8, end: u8) -> bool {
     }
     //UNSAFE
     let board: Board = simulate_move(old_board, start, end); 
-    let attacks: u64 = generate_attacks(&board); 
+    let attacks: u64 = generate_attacks(&board, None); 
     let moved_pieces: u64;
 
     let _promotion: bool = 1<<start & SEVENTH_RANK & old_board.white() & old_board.pawns() != 0;
@@ -697,7 +697,7 @@ pub fn capture_moves_only(board: &Board) -> Vec<u8> {
     }
     captures
 }
-pub fn ab_move_generation(board: &mut Board) -> Vec<u8> {
+pub fn ab_move_generation(board: &Board) -> Vec<u8> {
     let moves: Vec<u8> = generate_legal_moves(board);
     let mut quiet_moves: Vec<u8> = Vec::new();
     let mut checks: Vec<u8> = Vec::new();
@@ -740,10 +740,8 @@ pub fn ab_move_generation(board: &mut Board) -> Vec<u8> {
     ab_moves
 }
 
-pub fn is_check(board: &mut Board) -> bool {
-    board.is_white_move = !board.is_white_move;
-    let mut attacks: u64 = generate_attacks(board);
-    board.is_white_move = !board.is_white_move;
+pub fn is_check(board: &Board) -> bool {
+    let mut attacks: u64 = generate_attacks(board, Some(!board.is_white_move));
     let king: u8 = king_position(board);
     attacks &= 1<<king;
     return attacks != 0;
@@ -1233,7 +1231,7 @@ fn king_position(board: &Board) -> u8 {
     }
 }
 pub fn print_attacks(board: &Board) {
-    print_bit_board(generate_attacks(board));
+    print_bit_board(generate_attacks(board, None));
 }
 
 pub fn print_black(board: &Board) {
@@ -1254,13 +1252,15 @@ pub fn print_en(board: &Board) {
 
 
 
-fn generate_attacks(board: &Board) -> u64 { 
+fn generate_attacks(board: &Board, white_move_override: Option<bool>) -> u64 { 
     let mut attack: u64 = 0;
     let attack_pieces; 
     let _defend_pieces;
     let empty = !(board.black | board.white);
-    
-    if board.is_white_move {
+    let is_white_move = white_move_override.unwrap_or(board.is_white_move);
+
+
+    if is_white_move {
         attack_pieces = board.white;
         _defend_pieces = board.black;
     } else {
@@ -1268,7 +1268,7 @@ fn generate_attacks(board: &Board) -> u64 {
         _defend_pieces = board.white;
     }
 
-    if board.is_white_move{ //convert black and white into an array of len 2 and inx into that
+    if is_white_move{ //convert black and white into an array of len 2 and inx into that
         let capture_left: u64 = nowe(board.white & board.pawns & !A_FILE & !EIGTH_RANK);
         let capture_right: u64 = noea(board.white & board.pawns & !H_FILE & !EIGTH_RANK);
         

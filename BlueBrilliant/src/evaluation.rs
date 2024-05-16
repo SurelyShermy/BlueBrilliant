@@ -362,7 +362,7 @@ impl Evaluation{
     }
   }
 
-  pub fn iterative_deepening_ab_pruning(&mut self, board: &mut Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), max_depth: u32, maximizing_player: bool) -> (i32, (u8, u8), u32) {
+  pub fn iterative_deepening_ab_pruning(&mut self, board: &Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), max_depth: u32, maximizing_player: bool) -> (i32, (u8, u8), u32) {
     if !self.out_of_opening {
       if board.move_history.is_empty() {
           // Pick a random game sequence if the move history is empty
@@ -477,7 +477,7 @@ impl Evaluation{
 //     alpha
 // }
 
-  pub fn ab_pruning(&mut self, board: &mut Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), depth: u32, maximizing_player: bool, time: Instant, max_depth: u32, ply: u32) -> (i32, (u8, u8), u32) {
+  pub fn ab_pruning(&mut self, board: &Board, initial_alpha: i32, initial_beta: i32, mve: (u8, u8), depth: u32, maximizing_player: bool, time: Instant, max_depth: u32, ply: u32) -> (i32, (u8, u8), u32) {
     let mut node_count = 1;
     
     let hash = self.zobrist_keys.compute_hash(board);
@@ -733,7 +733,7 @@ impl Evaluation{
     }
   } 
 }
-pub fn evaluate_board(board: & mut Board, _move_count: i32) -> i32 {
+pub fn evaluate_board(board: &Board, _move_count: i32) -> i32 {
   let mut score: i32;
   let eg_phase: i32;
   //Perhaps calculate material can also pass the eg phase to allow for phase tapering
