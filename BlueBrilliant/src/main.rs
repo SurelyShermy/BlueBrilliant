@@ -237,7 +237,7 @@ async fn game_ws(game_id: String, ws: ws::WebSocket) -> ws::Channel<'static> {
                                         }
                                     }
                                     let mut mutex = owned_game_channel.lock().await;
-                                    broadcast_game_update(&mut mutex, &game_move.game_id, &game_state_str).await;
+                                    //broadcast_game_update(&mut mutex, &game_move.game_id, &game_state_str).await;
                                 },
                                 None => {}
                             }
